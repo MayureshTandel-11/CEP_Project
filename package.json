@@ -1,0 +1,21 @@
+{
+  "name": "wellness-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-Based Personal Nutrition, Activity & Wellness Recommendation System",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:ml": "cd ai-ml && python -m uvicorn app.main:app --reload --port 8000",
+    "seed": "npm run seed --prefix backend --",
+    "seed:demo": "npm run seed --prefix backend -- --demo-user",
+    "test": "npm test --prefix backend",
+    "test:ml": "cd ai-ml && python -m pytest -q",
+    "build": "npm run build --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

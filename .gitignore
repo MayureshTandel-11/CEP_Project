@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Secrets - never commit
+.env
+backend/.env
+frontend/.env
+ai-ml/.env
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Database / models
+*.db
+*.sqlite3
+ai-ml/models/model.pkl
+backend/app/ml/model.pkl
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log

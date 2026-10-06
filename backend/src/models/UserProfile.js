@@ -18,6 +18,13 @@ const profileSchema = new mongoose.Schema({
   foodDislikes: { type: [String], default: [] },
   mealFrequency: { type: Number, default: null },
   budget: { type: String, default: null },
+  medical_history: {
+    has_conditions: { type: Boolean, default: false },
+    conditions: { type: [String], default: [] },
+    other_condition: { type: String, default: '' },
+    medications: { type: [String], default: [] },
+    relevant_notes: { type: String, default: '' },
+  },
 }, { timestamps: true });
 
 profileSchema.virtual('allergy_list').get(function allergyList() {
@@ -46,6 +53,15 @@ profileSchema.methods.asEngine = function asEngine() {
     food_dislikes: this.foodDislikes || [],
     meal_frequency: this.mealFrequency,
     budget: this.budget,
+    medical_history: this.medical_history
+      ? {
+          has_conditions: this.medical_history.has_conditions || false,
+          conditions: this.medical_history.conditions || [],
+          other_condition: this.medical_history.other_condition || '',
+          medications: this.medical_history.medications || [],
+          relevant_notes: this.medical_history.relevant_notes || '',
+        }
+      : { has_conditions: false, conditions: [], other_condition: '', medications: [], relevant_notes: '' },
   };
 };
 
@@ -69,6 +85,15 @@ profileSchema.methods.toPublic = function toPublic() {
     food_dislikes: this.foodDislikes || [],
     meal_frequency: this.mealFrequency,
     budget: this.budget,
+    medical_history: this.medical_history
+      ? {
+          has_conditions: this.medical_history.has_conditions || false,
+          conditions: this.medical_history.conditions || [],
+          other_condition: this.medical_history.other_condition || '',
+          medications: this.medical_history.medications || [],
+          relevant_notes: this.medical_history.relevant_notes || '',
+        }
+      : { has_conditions: false, conditions: [], other_condition: '', medications: [], relevant_notes: '' },
     updated_at: this.updatedAt ? this.updatedAt.toISOString() : null,
   };
 };

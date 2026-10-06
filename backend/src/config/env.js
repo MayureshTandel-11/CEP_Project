@@ -23,6 +23,7 @@ const env = {
   mlTimeoutMs: Number(process.env.ML_TIMEOUT_MS || 4000),
   aiProvider: (process.env.AI_PROVIDER || 'openai').toLowerCase(),
   openaiApiKey: process.env.OPENAI_API_KEY || '',
+  openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   llamaApiUrl: process.env.LLAMA_API_URL || '',
   llamaApiKey: process.env.LLAMA_API_KEY || '',

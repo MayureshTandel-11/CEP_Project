@@ -10,7 +10,10 @@ import {
   Apple,
   Calculator,
   ShieldCheck,
-  Info
+  Info,
+  Brain,
+  AlertTriangle,
+  Stethoscope
 } from 'lucide-react'
 import Card from '../components/Card'
 import Disclaimer from '../components/Disclaimer'
@@ -104,6 +107,72 @@ export default function Nutrition() {
       </div>
 
       <div style={{ height: 24 }} />
+
+      {/* LLM-generated nutrition recommendations (when AI is active) */}
+      {data.llm_recommendations?.nutrition?.length > 0 && (
+        <>
+          {/* Medical safety banners */}
+          {data.llm_recommendations.professional_guidance && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.4)',
+              borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: '0.85rem',
+            }}>
+              <Stethoscope size={18} style={{ flexShrink: 0, marginTop: 1, color: '#d97706' }} />
+              <span>
+                <strong>Professional guidance recommended.</strong> Based on your profile, consider
+                discussing significant dietary changes with a healthcare professional.
+              </span>
+            </div>
+          )}
+          {data.llm_recommendations.medical_safety?.length > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+              borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: '0.84rem',
+            }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2, color: '#6366f1' }} />
+              <div>
+                <strong style={{ display: 'block', marginBottom: 4 }}>Medical context considered:</strong>
+                {data.llm_recommendations.medical_safety.map((note, i) => (
+                  <div key={i} style={{ marginBottom: 2 }}>• {note}</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Card
+            title="AI Nutrition Guidance"
+            sub={`Personalized by AI · Meal plan below uses your dietary rules`}
+            icon={Brain}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {data.llm_recommendations.summary && (
+                <p style={{ fontSize: '0.9rem', color: 'var(--ink)', margin: 0, fontStyle: 'italic' }}>
+                  {data.llm_recommendations.summary}
+                </p>
+              )}
+              {data.llm_recommendations.nutrition.map((rec, i) => (
+                <div className="food-item" key={i}>
+                  <div className="food-top">
+                    <span className="food-name">{rec.title}</span>
+                    <span className={`pill ${rec.priority === 'high' ? 'warn' : rec.priority === 'low' ? 'ok' : 'info'}`}>
+                      {rec.priority}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--ink)', marginTop: 4 }}>{rec.description}</div>
+                  {rec.reason && (
+                    <div className="food-reason" style={{ marginTop: 4 }}>
+                      <span style={{ fontWeight: 600 }}>Why:</span> {rec.reason}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div style={{ height: 24 }} />
+        </>
+      )}
 
       <Card
         title="Today's meals"

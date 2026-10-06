@@ -10,6 +10,45 @@ const REQUIRED_FIELDS = [
   'food_preference', 'sleep_hours', 'goal',
 ];
 
+const MAX_CONDITIONS = 20;
+const MAX_MEDICATIONS = 20;
+const MAX_TEXT_LENGTH = 500;
+
+/** Trim a string and hard-cap its length. Returns '' for non-strings. */
+function safeStr(value, maxLen = MAX_TEXT_LENGTH) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().slice(0, maxLen);
+}
+
+/**
+ * Clean and validate the optional medical_history block.
+ * Returns a safe object regardless of what was provided.
+ * Never throws — treat missing/invalid data as "no conditions".
+ */
+function cleanMedicalHistory(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { has_conditions: false, conditions: [], other_condition: '', medications: [], relevant_notes: '' };
+  }
+  const has_conditions = raw.has_conditions === true || raw.has_conditions === 'true';
+  let conditions = [];
+  if (has_conditions && Array.isArray(raw.conditions)) {
+    conditions = raw.conditions
+      .map((c) => safeStr(c, 100))
+      .filter(Boolean)
+      .slice(0, MAX_CONDITIONS);
+  }
+  const other_condition = has_conditions ? safeStr(raw.other_condition, 200) : '';
+  let medications = [];
+  if (Array.isArray(raw.medications)) {
+    medications = raw.medications
+      .map((m) => safeStr(m, 100))
+      .filter(Boolean)
+      .slice(0, MAX_MEDICATIONS);
+  }
+  const relevant_notes = safeStr(raw.relevant_notes, MAX_TEXT_LENGTH);
+  return { has_conditions, conditions, other_condition, medications, relevant_notes };
+}
+
 function clean(data) {
   validateRequired(data, REQUIRED_FIELDS);
   return {
@@ -29,6 +68,7 @@ function clean(data) {
     foodDislikes: normaliseTagList(data.food_dislikes),
     mealFrequency: validateInt(data.meal_frequency, 'meal_frequency', false),
     budget: data.budget || null,
+    medical_history: cleanMedicalHistory(data.medical_history),
   };
 }
 

@@ -3,10 +3,10 @@ import {
   User,
   Utensils,
   Activity,
-  CheckCircle2,
-  AlertCircle,
   Save,
-  ShieldAlert
+  ShieldAlert,
+  HeartPulse,
+  Info
 } from 'lucide-react'
 import Card from '../components/Card'
 import { ErrorState, Loading } from '../components/States'
@@ -14,12 +14,35 @@ import { useToast } from '../context/ToastContext'
 import useApi from '../hooks/useApi'
 import { api } from '../services/api'
 
+const COMMON_CONDITIONS = [
+  'Diabetes (Type 1 or Type 2)',
+  'Hypertension (High Blood Pressure)',
+  'High Cholesterol',
+  'Thyroid Condition',
+  'PCOS / PCOD',
+  'Anemia',
+  'Heart Disease',
+  'Kidney Disease',
+  'Liver Disease',
+  'Asthma',
+  'Gastrointestinal Condition',
+  'Food-Related Medical Restriction',
+  'Other',
+]
+
 const BLANK = {
   age: '', gender: 'male', height_cm: '', weight_kg: '',
   activity_level: 'light', food_preference: 'vegetarian', allergies: [],
   sleep_hours: 7, goal: 'general_wellness', work_type: '', sitting_hours: '',
   water_intake_ml: '', stress_level: '', food_dislikes: '', meal_frequency: '',
   budget: '',
+  medical_history: {
+    has_conditions: false,
+    conditions: [],
+    other_condition: '',
+    medications: '',
+    relevant_notes: '',
+  },
 }
 
 const RULES = {
@@ -41,6 +64,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (saved) {
+      const mh = saved.medical_history || {}
       setForm({
         ...BLANK, ...saved,
         allergies: saved.allergies || [],
@@ -48,6 +72,13 @@ export default function Profile() {
         work_type: saved.work_type || '', sitting_hours: saved.sitting_hours ?? '',
         water_intake_ml: saved.water_intake_ml ?? '', stress_level: saved.stress_level ?? '',
         meal_frequency: saved.meal_frequency ?? '', budget: saved.budget || '',
+        medical_history: {
+          has_conditions: mh.has_conditions || false,
+          conditions: mh.conditions || [],
+          other_condition: mh.other_condition || '',
+          medications: (mh.medications || []).join(', '),
+          relevant_notes: mh.relevant_notes || '',
+        },
       })
     }
   }, [saved])
@@ -79,6 +110,26 @@ export default function Profile() {
     }))
   }
 
+  /* ── Medical history helpers ── */
+  function setMedical(field, value) {
+    setForm((f) => ({
+      ...f,
+      medical_history: { ...f.medical_history, [field]: value },
+    }))
+  }
+
+  function toggleCondition(condition) {
+    setForm((f) => {
+      const current = f.medical_history.conditions || []
+      const next = current.includes(condition)
+        ? current.filter((c) => c !== condition)
+        : [...current, condition]
+      return { ...f, medical_history: { ...f.medical_history, conditions: next } }
+    })
+  }
+
+  const showsOther = form.medical_history.conditions.includes('Other')
+
   async function submit(e) {
     e.preventDefault()
     const found = {}
@@ -92,6 +143,11 @@ export default function Profile() {
       return
     }
 
+    const mh = form.medical_history
+    const medicationsArray = mh.medications
+      ? mh.medications.split(',').map((s) => s.trim()).filter(Boolean)
+      : []
+
     setBusy(true)
     try {
       await api.saveProfile({
@@ -101,6 +157,13 @@ export default function Profile() {
         water_intake_ml: form.water_intake_ml === '' ? null : form.water_intake_ml,
         stress_level: form.stress_level === '' ? null : form.stress_level,
         meal_frequency: form.meal_frequency === '' ? null : form.meal_frequency,
+        medical_history: {
+          has_conditions: mh.has_conditions,
+          conditions: mh.has_conditions ? mh.conditions : [],
+          other_condition: mh.has_conditions && showsOther ? mh.other_condition : '',
+          medications: medicationsArray,
+          relevant_notes: mh.relevant_notes || '',
+        },
       })
       toast.success('Profile saved.')
       reload()
@@ -213,6 +276,143 @@ export default function Profile() {
           </div>
         </Card>
 
+        <div style={{ height: 20 }} />
+
+        {/* ── Medical History Section ── */}
+        <Card
+          title="Medical History"
+          sub="Optional — used only to personalize wellness recommendations"
+          icon={HeartPulse}
+        >
+          {/* Privacy disclaimer */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            background: 'var(--surface-2, rgba(0,0,0,0.04))',
+            border: '1px solid var(--border, rgba(0,0,0,0.1))',
+            borderRadius: 8, padding: '10px 14px', marginBottom: 20,
+            fontSize: '0.82rem', color: 'var(--muted)',
+          }}>
+            <Info size={16} style={{ flexShrink: 0, marginTop: 2, color: 'var(--teal)' }} />
+            <span>
+              Medical information is used <strong>only</strong> to personalize wellness recommendations.
+              This application does not diagnose or treat medical conditions. This information is
+              stored securely and is not shared with third parties.
+            </span>
+          </div>
+
+          {/* Yes / No toggle */}
+          <div className="field" style={{ marginBottom: 16 }}>
+            <label style={{ fontWeight: 600, marginBottom: 10, display: 'block' }}>
+              Have you been diagnosed with any medical condition?
+            </label>
+            <div style={{ display: 'flex', gap: 12 }}>
+              {[false, true].map((val) => (
+                <label
+                  key={String(val)}
+                  className={`allergy-label${form.medical_history.has_conditions === val ? ' checked' : ''}`}
+                  style={{ padding: '8px 20px', cursor: 'pointer' }}
+                >
+                  <input
+                    type="radio"
+                    name="med_has_conditions"
+                    style={{ width: 'auto', margin: 0 }}
+                    checked={form.medical_history.has_conditions === val}
+                    onChange={() => setMedical('has_conditions', val)}
+                  />
+                  <span>{val ? 'Yes' : 'No'}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Condition checkboxes — only shown if Yes */}
+          {form.medical_history.has_conditions && (
+            <>
+              <div className="field" style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 600, marginBottom: 10, display: 'block' }}>
+                  Select diagnosed conditions <span style={{ fontWeight: 400, color: 'var(--muted)' }}>(select all that apply)</span>
+                </label>
+                <div className="grid cols-3">
+                  {COMMON_CONDITIONS.map((cond) => {
+                    const isChecked = form.medical_history.conditions.includes(cond)
+                    return (
+                      <label
+                        key={cond}
+                        className={`allergy-label${isChecked ? ' checked' : ''}`}
+                        style={{ fontSize: '0.83rem' }}
+                      >
+                        <input
+                          type="checkbox"
+                          style={{ width: 'auto', margin: 0 }}
+                          checked={isChecked}
+                          onChange={() => toggleCondition(cond)}
+                        />
+                        <span>{cond}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Other condition text field */}
+              {showsOther && (
+                <div className="field" style={{ marginBottom: 16 }}>
+                  <label htmlFor="med_other_condition">Please specify your condition</label>
+                  <input
+                    id="med_other_condition"
+                    type="text"
+                    maxLength={200}
+                    placeholder="Describe your condition briefly"
+                    value={form.medical_history.other_condition}
+                    onChange={(e) => setMedical('other_condition', e.target.value)}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Optional medications — shown regardless of has_conditions */}
+          <div className="field" style={{ marginBottom: 16 }}>
+            <label htmlFor="med_medications">
+              Current medications <span style={{ fontWeight: 400, color: 'var(--muted)' }}>(optional)</span>
+            </label>
+            <input
+              id="med_medications"
+              type="text"
+              placeholder="e.g. Metformin, Levothyroxine (comma-separated)"
+              value={form.medical_history.medications}
+              onChange={(e) => setMedical('medications', e.target.value)}
+            />
+            <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4 }}>
+              This helps generate recommendations that are appropriate alongside your treatment.
+            </div>
+          </div>
+
+          {/* Optional relevant notes */}
+          <div className="field">
+            <label htmlFor="med_relevant_notes">
+              Relevant medical notes <span style={{ fontWeight: 400, color: 'var(--muted)' }}>(optional)</span>
+            </label>
+            <textarea
+              id="med_relevant_notes"
+              rows={3}
+              maxLength={500}
+              placeholder="e.g. 'Low-sodium diet recommended by doctor', 'Avoid high-impact exercise due to joint condition'"
+              value={form.medical_history.relevant_notes}
+              onChange={(e) => setMedical('relevant_notes', e.target.value)}
+              style={{
+                width: '100%', resize: 'vertical', fontFamily: 'inherit',
+                fontSize: '0.9rem', padding: '10px 12px', borderRadius: 8,
+                border: '1px solid var(--border)', background: 'var(--input-bg)',
+                color: 'var(--ink)', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4 }}>
+              Max 500 characters. Do not include hospital records, doctor names, or insurance details.
+            </div>
+          </div>
+        </Card>
+
         <div className="btn-row" style={{ marginTop: 24 }}>
           <button type="submit" disabled={busy} className="topbar-cta-btn" style={{ padding: '10px 24px', fontSize: '0.9rem' }}>
             <Save size={16} />
@@ -220,6 +420,22 @@ export default function Profile() {
           </button>
         </div>
       </form>
+
+      {/* App-wide medical disclaimer */}
+      <div style={{
+        marginTop: 24, padding: '12px 16px', borderRadius: 8, fontSize: '0.8rem',
+        color: 'var(--muted)', border: '1px solid var(--border)',
+        background: 'var(--surface-2, rgba(0,0,0,0.03))',
+        display: 'flex', gap: 8, alignItems: 'flex-start',
+      }}>
+        <ShieldAlert size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>
+          This application provides general wellness guidance and is not a substitute for
+          professional medical advice, diagnosis, or treatment. Always consult a qualified
+          healthcare professional for medical concerns.
+        </span>
+      </div>
     </>
   )
 }
+

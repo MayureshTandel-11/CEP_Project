@@ -1,5 +1,18 @@
+import {
+  BrainCircuit,
+  Cpu,
+  Award,
+  TrendingUp,
+  Activity,
+  Layers,
+  Database,
+  CheckCircle,
+  HelpCircle,
+  AlertTriangle
+} from 'lucide-react'
 import Card from '../components/Card'
 import Disclaimer from '../components/Disclaimer'
+import Metric from '../components/Metric'
 import { EmptyState, ErrorState, Loading } from '../components/States'
 import useApi from '../hooks/useApi'
 import { api } from '../services/api'
@@ -9,7 +22,7 @@ const pretty = (s) => (s || '').replace(/_/g, ' ')
 export default function MLExplanation() {
   const { data, error, loading, reload } = useApi(() => api.mlExplanation(), [])
 
-  if (loading) return <Loading label="Reading the model" />
+  if (loading) return <Loading label="Retrieving Random Forest model parameters & weights…" />
   if (error) return <ErrorState error={error} onRetry={reload} />
 
   const importances = data.feature_importances || []
@@ -17,173 +30,282 @@ export default function MLExplanation() {
 
   return (
     <>
-      <h1>How the model decides</h1>
-      <p style={{ color: 'var(--ink-soft)' }}>
-        Every number on this page comes from the trained model file and your own
-        profile. Nothing here is hardcoded.
-      </p>
+      <div className="page-header">
+        <div>
+          <h1>How the model decides</h1>
+          <p className="page-subtitle">
+            Auditable machine learning transparency. Every metric and feature weight shown here reflects the active scikit-learn model and your profile inputs.
+          </p>
+        </div>
+        <span className={`pill ${data.model_available ? 'ok' : 'warn'}`}>
+          <Cpu size={13} />
+          <span>{data.model_available ? 'Model Online' : 'Model Offline (Using Rules)'}</span>
+        </span>
+      </div>
 
       {!data.model_available && (
-        <Card title="The model is not running">
-          <EmptyState title={data.ml_enabled ? 'Model file not loaded' : 'Model switched off'}>
-            ML is currently unavailable. The recommendation engine is operating using
-            rules and content-based filtering. Train the model with{' '}
-            <code>python -m app.training.train</code> from the <code>ai-ml</code> folder,
-            or set <code>ML_ENABLED=true</code> in the backend .env file.
-          </EmptyState>
+        <Card title="Machine Learning Service Notice" icon={AlertTriangle}>
+          <EmptyState
+            icon={Cpu}
+            title={data.ml_enabled ? 'Model weights not loaded' : 'ML service not connected'}
+            description="The recommendation engine is currently falling back to deterministic safety rules and content-based ranking. Core app functionality is unaffected."
+          />
         </Card>
       )}
 
+      {/* Model Performance KPIs */}
       <div className="grid cols-4">
-        <div className="metric">
-          <div className="label">Model</div>
-          <div className="value" style={{ fontSize: '1.1rem' }}>{data.model_type}</div>
-          <div className="note">{data.n_samples} training rows</div>
-        </div>
-        <div className="metric">
-          <div className="label">Accuracy</div>
-          <div className="value">{(data.metrics.accuracy * 100 || 0).toFixed(1)}<span> %</span></div>
-          <div className="note">on the held-out test split</div>
-        </div>
-        <div className="metric">
-          <div className="label">F1 score</div>
-          <div className="value">{data.metrics.f1}</div>
-          <div className="note">weighted across classes</div>
-        </div>
-        <div className="metric">
-          <div className="label">Precision / recall</div>
-          <div className="value" style={{ fontSize: '1.3rem' }}>
-            {data.metrics.precision} / {data.metrics.recall}
-          </div>
-          <div className="note">weighted</div>
-        </div>
+        <Metric
+          label="Model architecture"
+          value={data.model_type}
+          note={`${data.n_samples} training samples`}
+          icon={Cpu}
+          variant="teal"
+        />
+        <Metric
+          label="Test accuracy"
+          value={(data.metrics.accuracy * 100 || 0).toFixed(1)}
+          unit="%"
+          note="Held-out validation split"
+          icon={Award}
+          variant="emerald"
+        />
+        <Metric
+          label="F1 score"
+          value={data.metrics.f1}
+          note="Weighted across categories"
+          icon={TrendingUp}
+          variant="indigo"
+        />
+        <Metric
+          label="Precision / Recall"
+          value={`${data.metrics.precision} / ${data.metrics.recall}`}
+          note="Balanced macro scores"
+          icon={Activity}
+          variant="blue"
+        />
       </div>
 
-      <div style={{ height: 20 }} />
+      <div style={{ height: 24 }} />
 
-      <Card title="What the model weighs most"
-            sub="Feature importances read directly from the trained forest">
-        {importances.map((f) => (
-          <div className="imp-row" key={f.feature}>
-            <span className="fname" title={f.description}>{pretty(f.feature)}</span>
-            <span className="bar">
-              <i style={{ width: `${(f.importance / top) * 100}%` }} />
-            </span>
-            <span className="fval">{f.importance.toFixed(3)}</span>
-          </div>
-        ))}
+      {/* Feature Importances */}
+      <Card
+        title="Feature Importance Hierarchy"
+        sub="Relative weight assigned to each variable by the trained ensemble forest"
+        icon={Layers}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {importances.map((f) => {
+            const pct = Math.min(100, Math.max(0, (f.importance / top) * 100))
+
+            return (
+              <div className="imp-row" key={f.feature}>
+                <span className="imp-fname" title={f.description}>
+                  {pretty(f.feature)}
+                </span>
+                <div className="modern-progress-track">
+                  <div
+                    className="modern-progress-fill"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="imp-fval">
+                  {f.importance.toFixed(3)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
       </Card>
 
-      <Card title="Your prediction right now">
+      <div style={{ height: 24 }} />
+
+      {/* Prediction Output */}
+      <Card
+        title="Your Current Prediction"
+        sub="Inferred primary focus category based on your 14 biometric variables"
+        icon={BrainCircuit}
+      >
         {data.prediction?.available ? (
           <>
-            <p>
-              Predicted focus area:{' '}
-              <span className="pill ok">{data.prediction.category_label}</span>{' '}
-              with confidence {data.prediction.confidence}.
-            </p>
-            <p>{data.prediction.explanation}</p>
-            <h3>Probability across every category</h3>
-            <table>
-              <thead><tr><th>Category</th><th className="num">Probability</th></tr></thead>
-              <tbody>
-                {Object.entries(data.prediction.probabilities)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([name, p]) => (
-                    <tr key={name}>
-                      <td style={{ textTransform: 'capitalize' }}>{pretty(name)}</td>
-                      <td className="num">{(p * 100).toFixed(1)}%</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+            <div className="why-box" style={{ marginTop: 0, marginBottom: 18 }}>
+              <BrainCircuit size={18} className="why-icon" />
+              <div className="why-content">
+                <div>
+                  Primary focus predicted:{' '}
+                  <span className="pill ok" style={{ textTransform: 'capitalize', margin: '0 4px' }}>
+                    {pretty(data.prediction.category_label)}
+                  </span>{' '}
+                  with <strong>{Math.round(data.prediction.confidence * 100)}% confidence</strong>.
+                </div>
+                <div style={{ marginTop: 4, fontSize: '0.82rem' }}>{data.prediction.explanation}</div>
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '0.94rem', marginBottom: 10 }}>Probability distribution across all categories</h3>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th style={{ width: '40%' }}>Probability Bar</th>
+                    <th className="num">Calculated Likelihood</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(data.prediction.probabilities || {})
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([name, p]) => (
+                      <tr key={name}>
+                        <td style={{ textTransform: 'capitalize', fontWeight: 600 }}>{pretty(name)}</td>
+                        <td>
+                          <div className="modern-progress-track" style={{ height: 6 }}>
+                            <div
+                              className="modern-progress-fill"
+                              style={{ width: `${Math.round(p * 100)}%` }}
+                            />
+                          </div>
+                        </td>
+                        <td className="num" style={{ fontWeight: 700 }}>
+                          {(p * 100).toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </>
         ) : (
-          <EmptyState title="No prediction available">
-            {data.prediction?.reason} Your recommendations are coming from the rule
-            engine instead.
-          </EmptyState>
+          <EmptyState
+            icon={BrainCircuit}
+            title="No prediction calculated"
+            description={data.prediction?.reason || 'Recommendations are currently generated by the rule engine.'}
+          />
         )}
       </Card>
 
-      <Card title="The features your profile produced"
-            sub="These fourteen numbers are exactly what the model receives">
-        <table>
-          <thead>
-            <tr><th>Feature</th><th className="num">Your value</th><th>What it means</th></tr>
-          </thead>
-          <tbody>
-            {Object.entries(data.your_features).map(([name, value]) => (
-              <tr key={name}>
-                <td style={{ textTransform: 'capitalize' }}>{pretty(name)}</td>
-                <td className="num">{value}</td>
-                <td style={{ color: 'var(--ink-soft)', fontSize: '.82rem' }}>
-                  {data.feature_descriptions[name]}
-                </td>
+      <div style={{ height: 24 }} />
+
+      {/* Feature Values */}
+      <Card
+        title="Features derived from your profile"
+        sub="The exact 14 normalized values passed into the Random Forest inference vector"
+        icon={Cpu}
+      >
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Feature Name</th>
+                <th className="num">Your Value</th>
+                <th>Meaning & Normalization</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {Object.entries(data.your_features || {}).map(([name, value]) => (
+                <tr key={name}>
+                  <td style={{ textTransform: 'capitalize', fontWeight: 600 }}>{pretty(name)}</td>
+                  <td className="num" style={{ fontWeight: 700, color: 'var(--teal-800)' }}>{value}</td>
+                  <td style={{ color: 'var(--ink-soft)', fontSize: '0.8rem' }}>
+                    {data.feature_descriptions?.[name] || 'Normalized input metric'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
+      {/* Confusion Matrix */}
       {data.confusion_matrix && (
-        <Card title="Confusion matrix"
-              sub="Rows are the true category, columns are what the model predicted">
-          <div style={{ overflowX: 'auto' }}>
+        <>
+          <div style={{ height: 24 }} />
+          <Card
+            title="Model Confusion Matrix"
+            sub="Validation split: Rows represent ground truth; columns indicate model predictions"
+            icon={Layers}
+          >
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>True \ Predicted</th>
+                    {data.confusion_labels.map((l) => (
+                      <th className="num" key={l} style={{ textTransform: 'capitalize' }}>
+                        {pretty(l)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.confusion_matrix.map((row, i) => (
+                    <tr key={data.confusion_labels[i]}>
+                      <td style={{ textTransform: 'capitalize', fontWeight: 600 }}>
+                        {pretty(data.confusion_labels[i])}
+                      </td>
+                      {row.map((n, j) => (
+                        <td
+                          className="num"
+                          key={j}
+                          style={{
+                            fontWeight: i === j ? 700 : 400,
+                            color: i === j ? 'var(--teal)' : 'var(--ink-soft)',
+                            background: i === j ? 'var(--teal-soft)' : 'transparent',
+                          }}
+                        >
+                          {n}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
+
+      <div style={{ height: 24 }} />
+
+      {/* Dataset & Training Provenance */}
+      <Card
+        title="Training Dataset & Governance"
+        sub="Provenance and model iteration tracking"
+        icon={Database}
+      >
+        <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--ink)' }}>{data.data_source}</p>
+        <p style={{ color: 'var(--ink-soft)', fontSize: '0.8rem', marginTop: 6 }}>
+          Last trained: <strong>{data.trained_at ? new Date(data.trained_at).toLocaleString() : 'Not recorded'}</strong>.
+          Safety guarantee: The machine learning model strictly re-ranks recommendations that have passed deterministic allergen and medical exclusion rules.
+        </p>
+
+        {data.training_runs && data.training_runs.length > 0 && (
+          <div className="table-container" style={{ marginTop: 14 }}>
             <table>
               <thead>
                 <tr>
-                  <th>True \ predicted</th>
-                  {data.confusion_labels.map((l) => (
-                    <th className="num" key={l}>{pretty(l)}</th>
-                  ))}
+                  <th>Training Run Timestamp</th>
+                  <th className="num">Sample Rows</th>
+                  <th className="num">Validation Accuracy</th>
+                  <th>Production Status</th>
                 </tr>
               </thead>
               <tbody>
-                {data.confusion_matrix.map((row, i) => (
-                  <tr key={data.confusion_labels[i]}>
-                    <td style={{ textTransform: 'capitalize' }}>
-                      {pretty(data.confusion_labels[i])}
+                {data.training_runs.map((r) => (
+                  <tr key={r.id}>
+                    <td>{(r.created_at || '').slice(0, 16).replace('T', ' ')}</td>
+                    <td className="num">{r.n_samples}</td>
+                    <td className="num" style={{ fontWeight: 600 }}>{(r.accuracy * 100).toFixed(1)}%</td>
+                    <td>
+                      <span className={`pill ${r.promoted ? 'ok' : 'neutral'}`}>
+                        {r.promoted ? 'Promoted' : 'Archived'}
+                      </span>
                     </td>
-                    {row.map((n, j) => (
-                      <td className="num" key={j}
-                          style={{ fontWeight: i === j ? 600 : 400,
-                                   color: i === j ? 'var(--teal)' : 'inherit' }}>
-                        {n}
-                      </td>
-                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </Card>
-      )}
-
-      <Card title="Where the training data came from">
-        <p>{data.data_source}</p>
-        <p style={{ color: 'var(--ink-soft)', fontSize: '.88rem' }}>
-          Trained {data.trained_at ? new Date(data.trained_at).toLocaleString() : 'not yet'}.
-          The model only re-ranks options that already passed your allergy and
-          dietary rules, so it can never reintroduce a food you cannot eat.
-        </p>
-        {data.training_runs.length > 0 && (
-          <table>
-            <thead>
-              <tr><th>Run</th><th className="num">Rows</th><th className="num">Accuracy</th>
-                <th>Promoted</th></tr>
-            </thead>
-            <tbody>
-              {data.training_runs.map((r) => (
-                <tr key={r.id}>
-                  <td>{(r.created_at || '').slice(0, 16).replace('T', ' ')}</td>
-                  <td className="num">{r.n_samples}</td>
-                  <td className="num">{r.accuracy}</td>
-                  <td>{r.promoted ? 'Yes' : 'No'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         )}
       </Card>
 

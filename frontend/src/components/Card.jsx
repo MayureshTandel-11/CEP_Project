@@ -1,14 +1,18 @@
-export default function Card({ title, sub, actions, children }) {
+export default function Card({ title, sub, icon: Icon, actions, children, className = '' }) {
   return (
-    <section className="card">
+    <section className={`card ${className}`}>
       {(title || actions) && (
-        <header style={{ display: 'flex', justifyContent: 'space-between',
-                         alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            {title && <h2>{title}</h2>}
+        <header>
+          <div className="card-title-group">
+            {title && (
+              <h2>
+                {Icon && <Icon size={20} className="card-title-icon" />}
+                <span>{title}</span>
+              </h2>
+            )}
             {sub && <div className="sub">{sub}</div>}
           </div>
-          {actions}
+          {actions && <div className="card-actions">{actions}</div>}
         </header>
       )}
       {children}

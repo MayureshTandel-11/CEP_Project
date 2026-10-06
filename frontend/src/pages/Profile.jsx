@@ -1,4 +1,13 @@
 import { useEffect, useState } from 'react'
+import {
+  User,
+  Utensils,
+  Activity,
+  CheckCircle2,
+  AlertCircle,
+  Save,
+  ShieldAlert
+} from 'lucide-react'
 import Card from '../components/Card'
 import { ErrorState, Loading } from '../components/States'
 import { useToast } from '../context/ToastContext'
@@ -43,7 +52,7 @@ export default function Profile() {
     }
   }, [saved])
 
-  if (loading || optionsLoading) return <Loading label="Loading your profile" />
+  if (loading || optionsLoading) return <Loading label="Loading your profile data…" />
   if (error) return <ErrorState error={error} onRetry={reload} />
 
   const change = (e) => {
@@ -127,13 +136,17 @@ export default function Profile() {
 
   return (
     <>
-      <h1>My profile</h1>
-      <p style={{ color: 'var(--ink-soft)' }}>
-        Everything below feeds your calorie targets, meal filters and activity plan.
-      </p>
+      <div className="page-header">
+        <div>
+          <h1>My profile</h1>
+          <p className="page-subtitle">
+            Configure your personal biometric baselines, dietary restrictions, and lifestyle parameters.
+          </p>
+        </div>
+      </div>
 
       <form onSubmit={submit} noValidate>
-        <Card title="About you">
+        <Card title="About you" sub="Biometrics used to calculate BMR, TDEE and calorie targets" icon={User}>
           <div className="grid cols-3">
             {field('age', 'Age', { type: 'number', min: 10, max: 100, required: true })}
             {select('gender', 'Gender', options.genders)}
@@ -146,7 +159,9 @@ export default function Profile() {
           </div>
         </Card>
 
-        <Card title="Food">
+        <div style={{ height: 20 }} />
+
+        <Card title="Food & Dietary Preferences" sub="Filters and rules applied across meal suggestions" icon={Utensils}>
           <div className="grid cols-3">
             {select('food_preference', 'Food preference', options.food_preferences)}
             {field('sleep_hours', 'Usual sleep (hours)',
@@ -155,22 +170,36 @@ export default function Profile() {
               { placeholder: 'e.g. paneer, corn' })}
           </div>
 
-          <fieldset>
-            <legend>Allergies — anything ticked is removed from every meal</legend>
+          <div style={{ marginTop: 16 }}>
+            <label style={{ marginBottom: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ShieldAlert size={16} color="var(--rose)" />
+              <span>Allergens — anything checked will be completely excluded from every meal</span>
+            </label>
             <div className="grid cols-4">
-              {options.allergens.map((tag) => (
-                <label key={tag} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="checkbox" style={{ width: 'auto' }}
-                         checked={form.allergies.includes(tag)}
-                         onChange={() => toggleAllergy(tag)} />
-                  {pretty(tag)}
-                </label>
-              ))}
+              {options.allergens.map((tag) => {
+                const isChecked = form.allergies.includes(tag)
+                return (
+                  <label
+                    key={tag}
+                    className={`allergy-label ${isChecked ? 'checked' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      style={{ width: 'auto', margin: 0 }}
+                      checked={isChecked}
+                      onChange={() => toggleAllergy(tag)}
+                    />
+                    <span>{pretty(tag)}</span>
+                  </label>
+                )
+              })}
             </div>
-          </fieldset>
+          </div>
         </Card>
 
-        <Card title="Lifestyle" sub="Optional, but it sharpens the suggestions">
+        <div style={{ height: 20 }} />
+
+        <Card title="Lifestyle & Daily Habits" sub="Optional information that sharpens activity recommendations and ML predictions" icon={Activity}>
           <div className="grid cols-3">
             {field('work_type', 'Work type', { placeholder: 'desk, field, shift…' })}
             {field('sitting_hours', 'Sitting hours a day',
@@ -184,9 +213,10 @@ export default function Profile() {
           </div>
         </Card>
 
-        <div className="btn-row">
-          <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Save profile'}
+        <div className="btn-row" style={{ marginTop: 24 }}>
+          <button type="submit" disabled={busy} className="topbar-cta-btn" style={{ padding: '10px 24px', fontSize: '0.9rem' }}>
+            <Save size={16} />
+            <span>{busy ? 'Saving profile…' : 'Save profile'}</span>
           </button>
         </div>
       </form>

@@ -2,15 +2,16 @@ const RANGES = [7, 30, 90]
 
 export default function RangePicker({ value, onChange }) {
   return (
-    <div className="btn-row" role="group" aria-label="Time range">
+    <div className="segmented-control" role="group" aria-label="Time range selector">
       {RANGES.map((days) => (
         <button
           key={days}
-          className="ghost"
+          type="button"
+          className={`segmented-btn ${value === days ? 'active' : ''}`}
           aria-pressed={value === days}
           onClick={() => onChange(days)}
         >
-          {days} days
+          {days} Days
         </button>
       ))}
     </div>

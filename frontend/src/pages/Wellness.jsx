@@ -1,3 +1,12 @@
+import {
+  HeartPulse,
+  Sparkles,
+  Droplets,
+  Moon,
+  Smile,
+  ShieldCheck,
+  Brain
+} from 'lucide-react'
 import Card from '../components/Card'
 import Disclaimer from '../components/Disclaimer'
 import Why from '../components/Why'
@@ -5,37 +14,80 @@ import { EmptyState, ErrorState, Loading } from '../components/States'
 import useApi from '../hooks/useApi'
 import { api } from '../services/api'
 
+function getTipIcon(code = '') {
+  const c = code.toLowerCase()
+  if (c.includes('water') || c.includes('hydrate')) return Droplets
+  if (c.includes('sleep') || c.includes('rest')) return Moon
+  if (c.includes('stress') || c.includes('mood')) return Smile
+  return HeartPulse
+}
+
 export default function Wellness() {
   const { data, error, loading, reload } = useApi(() => api.wellness(), [])
 
-  if (loading) return <Loading label="Building your wellness plan" />
+  if (loading) return <Loading label="Evaluating your lifestyle logs & wellness rules…" />
   if (error) return <ErrorState error={error} onRetry={reload} />
 
-  const tips = data.tips || []
+  const tips = data?.tips || []
+  const isHybrid = data?.source === 'hybrid'
 
   return (
     <>
-      <h1>Wellness plan</h1>
-      <p style={{ color: 'var(--ink-soft)' }}>
-        Sleep, hydration, stress and daily habits based on your logs and rules.
-        {data.source === 'rules_only'
-          ? ' ML is currently unavailable. The recommendation engine is operating using rules and content-based filtering.'
-          : ''}
-      </p>
+      <div className="page-header">
+        <div>
+          <h1>Wellness plan</h1>
+          <p className="page-subtitle">
+            Evidence-based recovery, sleep, hydration, and stress habits tailored to your recent logs.
+          </p>
+        </div>
+        <span className={`pill ${isHybrid ? 'ok' : 'info'}`}>
+          <Brain size={13} />
+          <span>{isHybrid ? 'Hybrid Rules + ML Ranking' : 'Rule Engine Active'}</span>
+        </span>
+      </div>
 
-      <Card title="Today's wellness focus" sub={data.source === 'hybrid' ? 'Rules first, ML focus second' : 'Rule engine only'}>
+      <Card
+        title="Today's Wellness Focus"
+        sub={isHybrid
+          ? 'Deterministically filtered for safety, with machine learning personalized focus ranking.'
+          : 'Operating using rule-based algorithms (ML model service is currently offline).'}
+        icon={HeartPulse}
+      >
         {tips.length === 0 ? (
-          <EmptyState>Complete your profile and logs to see wellness tips.</EmptyState>
+          <EmptyState
+            icon={HeartPulse}
+            title="No wellness tips yet"
+            description="Complete your profile biometrics and record daily logs to generate tailored wellness insights."
+            actionText="Go to logs"
+            actionLink="/logs"
+          />
         ) : (
-          <ul style={{ paddingLeft: 18, margin: 0 }}>
-            {tips.map((tip) => (
-              <li key={tip.code} style={{ marginBottom: 12 }}>
-                <strong>{tip.code.replace(/_/g, ' ')}</strong>
-                <div>{tip.message}</div>
-                <div style={{ fontSize: '.82rem', color: 'var(--ink-soft)' }}>{tip.reason}</div>
-              </li>
-            ))}
-          </ul>
+          <div className="recommendations-grid">
+            {tips.map((tip) => {
+              const Icon = getTipIcon(tip.code)
+              const cleanTitle = (tip.code || '').replace(/_/g, ' ')
+
+              return (
+                <div className="recommendation-card" key={tip.code}>
+                  <div className="rec-card-header">
+                    <div className="rec-icon-badge metric-icon-badge teal">
+                      <Icon size={16} strokeWidth={2.2} />
+                    </div>
+                    <span className="rec-tag" style={{ textTransform: 'capitalize' }}>
+                      {cleanTitle}
+                    </span>
+                  </div>
+
+                  <div className="rec-card-body">
+                    <div className="rec-headline">{tip.message}</div>
+                    {tip.reason && (
+                      <div className="rec-sub">{tip.reason}</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
       </Card>
 

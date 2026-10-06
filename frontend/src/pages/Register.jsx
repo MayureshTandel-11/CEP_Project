@@ -1,6 +1,10 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import Disclaimer from '../components/Disclaimer'
+import { useNavigate } from 'react-router-dom'
+import { User, Mail, AlertCircle, Check, CheckCircle2 } from 'lucide-react'
+import AuthLayout from '../components/auth/AuthLayout'
+import FormField from '../components/auth/FormField'
+import PasswordField from '../components/auth/PasswordField'
+import PrimaryButton from '../components/auth/PrimaryButton'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
@@ -8,72 +12,165 @@ export default function Register() {
   const { register } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' })
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
-  const change = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  const change = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value })
+    if (error) setError(null)
+  }
 
-  const passwordOk = form.password.length >= 8 &&
-    /[A-Za-z]/.test(form.password) && /\d/.test(form.password)
-  const showPasswordHint = form.password.length > 0 && !passwordOk
+  const lengthOk = form.password.length >= 8
+  const letterAndNumOk = /[A-Za-z]/.test(form.password) && /\d/.test(form.password)
+  const passwordsMatch = form.password.length > 0 && form.password === form.confirmPassword
+  const passwordValid = lengthOk && letterAndNumOk && passwordsMatch
 
   async function submit(e) {
     e.preventDefault()
-    if (!passwordOk) return
+
+    if (!form.name.trim()) {
+      setError('Please enter your full name.')
+      return
+    }
+    if (!form.email.trim()) {
+      setError('Please enter a valid email address.')
+      return
+    }
+    if (!lengthOk || !letterAndNumOk) {
+      setError('Password must be at least 8 characters and contain both letters and numbers.')
+      return
+    }
+    if (form.password !== form.confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+
     setBusy(true)
     setError(null)
     try {
-      await register(form)
-      toast.success('Account created. Next, complete your profile.')
+      await register({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+      })
+      toast.success('Account created! Next, configure your wellness profile.')
       navigate('/profile')
     } catch (err) {
-      setError(err.message)
+      const msg = err.message || 'Unable to create account. Please try again.'
+      setError(msg.includes('<!DOCTYPE') ? 'Unable to reach the server. Please try again later.' : msg)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="auth-wrap">
-      <div className="auth-card">
-        <div className="brand">Create your account</div>
-        <p className="lede">Takes a minute. Your data stays visible only to you.</p>
+    <AuthLayout
+      title="Create your wellness profile"
+      subtitle="Start building healthier habits with personalized insights."
+      footerPrompt="Already have an account?"
+      footerLinkText="Sign in"
+      footerLinkTo="/login"
+    >
+      {/* Onboarding Step Progress Indicator */}
+      <div className="auth-step-indicator-wrap" aria-label="Onboarding Progress">
+        <div className="auth-step-labels">
+          <span className="auth-step-pill active">01 Account</span>
+          <span className="auth-step-line" />
+          <span className="auth-step-pill">02 Biometrics</span>
+          <span className="auth-step-line" />
+          <span className="auth-step-pill">03 Goals</span>
+        </div>
+        <div className="auth-step-caption">Step 1 of 3 · Credentials & Login</div>
+      </div>
 
-        <form onSubmit={submit} noValidate>
-          <div className="field">
-            <label htmlFor="name">Name</label>
-            <input id="name" name="name" value={form.name} onChange={change} required />
+      <form onSubmit={submit} noValidate className="auth-form-element">
+        {error && (
+          <div className="auth-global-error" role="alert">
+            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+            <span>{error}</span>
           </div>
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input id="email" name="email" type="email" autoComplete="email"
-                   value={form.email} onChange={change} required />
-          </div>
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <input id="password" name="password" type="password"
-                   autoComplete="new-password"
-                   aria-invalid={showPasswordHint}
-                   aria-describedby="pw-hint"
-                   value={form.password} onChange={change} required />
-            <div id="pw-hint" className={showPasswordHint ? 'err' : 'hint'}>
-              At least 8 characters, with one letter and one number.
+        )}
+
+        <FormField
+          id="name"
+          name="name"
+          label="Full name"
+          placeholder="e.g. Hardik Singh"
+          value={form.name}
+          onChange={change}
+          icon={User}
+          autoComplete="name"
+          required
+          disabled={busy}
+        />
+
+        <FormField
+          id="email"
+          name="email"
+          type="email"
+          label="Email address"
+          placeholder="you@domain.com"
+          value={form.email}
+          onChange={change}
+          icon={Mail}
+          autoComplete="email"
+          required
+          disabled={busy}
+        />
+
+        <PasswordField
+          id="password"
+          name="password"
+          label="Password"
+          placeholder="At least 8 characters"
+          value={form.password}
+          onChange={change}
+          autoComplete="new-password"
+          required
+          disabled={busy}
+        />
+
+        <PasswordField
+          id="confirmPassword"
+          name="confirmPassword"
+          label="Confirm password"
+          placeholder="Re-enter your password"
+          value={form.confirmPassword}
+          onChange={change}
+          autoComplete="new-password"
+          required
+          disabled={busy}
+          error={form.confirmPassword && !passwordsMatch ? 'Passwords do not match' : null}
+        />
+
+        {/* Live Password Criteria UX */}
+        {form.password.length > 0 && (
+          <div className="auth-password-criteria-box">
+            <div className={`auth-criteria-item ${lengthOk ? 'met' : ''}`}>
+              <span className="auth-criteria-icon">{lengthOk ? <Check size={12} strokeWidth={3} /> : '•'}</span>
+              <span>8+ characters</span>
+            </div>
+            <div className={`auth-criteria-item ${letterAndNumOk ? 'met' : ''}`}>
+              <span className="auth-criteria-icon">{letterAndNumOk ? <Check size={12} strokeWidth={3} /> : '•'}</span>
+              <span>Letters & numbers</span>
+            </div>
+            <div className={`auth-criteria-item ${passwordsMatch ? 'met' : ''}`}>
+              <span className="auth-criteria-icon">{passwordsMatch ? <Check size={12} strokeWidth={3} /> : '•'}</span>
+              <span>Passwords match</span>
             </div>
           </div>
+        )}
 
-          {error && <p className="field err" role="alert">{error}</p>}
-
-          <button type="submit" disabled={busy || !passwordOk} style={{ width: '100%' }}>
-            {busy ? 'Creating…' : 'Create account'}
-          </button>
-        </form>
-
-        <p style={{ marginTop: 16, fontSize: '.9rem' }}>
-          Already registered? <Link to="/login">Sign in</Link>
-        </p>
-        <Disclaimer />
-      </div>
-    </div>
+        <PrimaryButton
+          type="submit"
+          loading={busy}
+          loadingText="Creating account…"
+          disabled={busy || !form.name || !form.email || !passwordValid}
+        >
+          Create account & continue
+        </PrimaryButton>
+      </form>
+    </AuthLayout>
   )
 }

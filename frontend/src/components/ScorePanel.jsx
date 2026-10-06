@@ -1,31 +1,92 @@
-/** The dashboard's one loud element: the weekly engagement score. */
+import { Link } from 'react-router-dom'
+import {
+  Sparkles,
+  Salad,
+  Flame,
+  Droplets,
+  Moon,
+  PlusCircle,
+  HelpCircle
+} from 'lucide-react'
+
+const CATEGORY_ICONS = {
+  nutrition: Salad,
+  activity: Flame,
+  hydration: Droplets,
+  sleep: Moon,
+}
+
 export default function ScorePanel({ score }) {
   if (!score?.available) {
-    return <p style={{ color: 'var(--ink-soft)' }}>{score?.message || 'No data yet.'}</p>
-  }
-  const rows = Object.entries(score.categories)
-  return (
-    <>
-      <div className="score-panel">
-        <div className="score-dial">
-          <span className="n">{score.overall}</span>
-          <span className="of">out of 100 · {score.days_logged} days logged</span>
+    return (
+      <div className="state-container" style={{ padding: '32px 20px', background: 'transparent' }}>
+        <div className="state-icon-bubble" style={{ background: 'var(--teal-soft)', color: 'var(--teal)' }}>
+          <Sparkles size={26} strokeWidth={2} />
         </div>
-        <div className="score-bars">
-          {rows.map(([name, item]) => (
-            <div className="score-row" key={name}>
-              <span className="name" style={{ textTransform: 'capitalize' }}>{name}</span>
-              <span className={`bar ${item.score < 60 ? 'warn' : ''}`}>
-                <i style={{ width: `${item.score}%` }} />
-              </span>
-              <span className="num">{item.score}</span>
-            </div>
-          ))}
+        <div className="state-title">No wellness activity yet</div>
+        <p className="state-description">
+          {score?.message || 'Start logging your daily nutrition, water, sleep and activity to calculate your weekly engagement score.'}
+        </p>
+        <Link to="/logs" className="topbar-cta-btn" style={{ padding: '8px 18px', fontSize: '0.86rem' }}>
+          <PlusCircle size={16} />
+          <span>Start logging</span>
+        </Link>
+      </div>
+    )
+  }
+
+  const rows = Object.entries(score.categories || {})
+
+  return (
+    <div className="score-panel-wrap">
+      <div className="score-panel-container">
+        {/* Modern Circular Score Badge */}
+        <div className="score-ring-wrap">
+          <div className="score-circular-badge">
+            <span className="score-number">{score.overall}</span>
+            <span className="score-total">out of 100</span>
+          </div>
+          <div className="score-logged-days">
+            {score.days_logged} {score.days_logged === 1 ? 'day' : 'days'} logged
+          </div>
+        </div>
+
+        {/* Categories Breakdown */}
+        <div className="score-bars-container">
+          {rows.map(([name, item]) => {
+            const Icon = CATEGORY_ICONS[name.toLowerCase()] || Sparkles
+            const val = item.score ?? 0
+            const isWarn = val < 60
+
+            return (
+              <div className="score-category-row" key={name}>
+                <div className="category-name-wrap">
+                  <Icon size={15} style={{ color: isWarn ? 'var(--amber)' : 'var(--teal)' }} />
+                  <span>{name}</span>
+                </div>
+
+                <div className="modern-progress-track">
+                  <div
+                    className={`modern-progress-fill ${isWarn ? 'warn' : ''}`}
+                    style={{ width: `${Math.min(100, Math.max(0, val))}%` }}
+                  />
+                </div>
+
+                <div className="category-score-val">
+                  {val}%
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
-      <p style={{ fontSize: '.8rem', color: 'var(--ink-faint)', marginTop: 14, marginBottom: 0 }}>
-        {score.disclaimer}
-      </p>
-    </>
+
+      {score.disclaimer && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, fontSize: '0.76rem', color: 'var(--ink-faint)' }}>
+          <HelpCircle size={14} />
+          <span>{score.disclaimer}</span>
+        </div>
+      )}
+    </div>
   )
 }

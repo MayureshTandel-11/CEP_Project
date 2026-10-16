@@ -34,9 +34,12 @@ async function fetchJson(path, { method = 'GET', body, timeoutMs } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || env.mlTimeoutMs);
   try {
+    const headers = {};
+    if (body) headers['Content-Type'] = 'application/json';
+    if (env.mlInternalToken) headers['X-Internal-Token'] = env.mlInternalToken;
     const res = await fetch(`${env.mlServiceUrl}${path}`, {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });

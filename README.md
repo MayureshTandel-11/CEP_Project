@@ -90,6 +90,17 @@ cp frontend/.env.example frontend/.env   # optional
 cp ai-ml/.env.example ai-ml/.env
 ```
 
+Set these two values for the model-retraining features:
+
+- `ADMIN_EMAILS` (backend): comma-separated account emails allowed to call
+  `POST /api/ml/retrain`. Empty means nobody can. The app has no email verification,
+  so **register the admin account first**, before the app is reachable by others;
+  otherwise someone else could register that address and become an admin.
+- `ML_INTERNAL_TOKEN` (backend **and** `ai-ml`, same value): shared secret sent as
+  `X-Internal-Token`. Without it, FastAPI's `/train`, `/retrain` and `/evaluate` return
+  503, and once it is set `/predict` and `/model/*` require it too. Do not expose port
+  8000 publicly; keep the ML service on localhost or a private network.
+
 ### 3. Seed MongoDB
 
 ```bash

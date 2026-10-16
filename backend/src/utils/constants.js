@@ -113,6 +113,8 @@ const DISCLAIMER = (
 );
 
 const ML_BONUS_CAP = 0.15;
+// The ML classifier needs recent behaviour; with fewer logged days than this it is skipped.
+const MIN_LOG_DAYS_FOR_ML = 3;
 
 const FEATURE_NAMES = [
   'bmi', 'age', 'activity_score', 'sleep_hours', 'sleep_adequacy',
@@ -175,6 +177,7 @@ module.exports = {
   KNOWN_ALLERGENS,
   DISCLAIMER,
   ML_BONUS_CAP,
+  MIN_LOG_DAYS_FOR_ML,
   FEATURE_NAMES,
   FEATURE_DESCRIPTIONS,
 };

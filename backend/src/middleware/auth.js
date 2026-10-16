@@ -1,3 +1,3 @@
-const { requireAuth } = require('../utils/security');
+const { requireAuth, requireAdmin } = require('../utils/security');
 
-module.exports = { requireAuth };
+module.exports = { requireAuth, requireAdmin };

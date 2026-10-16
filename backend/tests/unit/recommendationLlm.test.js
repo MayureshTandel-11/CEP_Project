@@ -12,7 +12,7 @@ jest.mock('../../src/services/nutritionService', () => ({ generateNutritionPlan:
 jest.mock('../../src/services/wellnessService', () => ({
   getLogs: jest.fn(async () => []),
   summariseLogs: jest.fn(() => ({
-    count: 0, avg_sleep: null, avg_water: null, avg_steps: null, avg_exercise_minutes: null,
+    count: 3, avg_sleep: null, avg_water: null, avg_steps: null, avg_exercise_minutes: null,
     avg_calories: null, avg_mood: null, avg_stress: null, latest_weight: null,
   })),
 }));

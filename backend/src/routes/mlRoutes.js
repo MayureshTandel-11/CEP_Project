@@ -1,8 +1,9 @@
 const express = require('express');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { explanation, retrainFromFeedback } = require('../controllers/mlController');
 
 const router = express.Router();
 router.get('/explanation', requireAuth, explanation);
-router.post('/retrain', requireAuth, retrainFromFeedback);
+// Retraining replaces the shared model for every user, so it is admin-only.
+router.post('/retrain', requireAuth, requireAdmin, retrainFromFeedback);
 module.exports = router;

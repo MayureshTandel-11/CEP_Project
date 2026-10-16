@@ -44,8 +44,37 @@ function requireAuth(req, _res, next) {
   return next();
 }
 
+/**
+ * Allow only users whose account email is listed in ADMIN_EMAILS.
+ * Fails closed: with no admin configured, nobody is an admin.
+ */
+async function requireAdmin(req, _res, next) {
+  try {
+    const userId = currentUserId(req);
+    if (!userId) {
+      return next(new AuthError('You need to sign in to access this resource.'));
+    }
+    const { env } = require('../config/env');
+    if (!env.adminEmails.length) {
+      return next(new ForbiddenError('Administrator access is not configured.'));
+    }
+    const { User } = require('../models');
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(new AuthError('You need to sign in to access this resource.'));
+    }
+    if (!env.adminEmails.includes(String(user.email || '').toLowerCase())) {
+      return next(new ForbiddenError('Administrator access is required.'));
+    }
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   SESSION_USER_KEY,
+  requireAdmin,
   hashPassword,
   verifyPassword,
   loginUser,

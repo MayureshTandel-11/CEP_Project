@@ -7,6 +7,7 @@ const { predictCategory } = require('./mlService');
 const { generateNutritionPlan } = require('./nutritionService');
 const { getLogs, summariseLogs } = require('./wellnessService');
 const { evaluateRules } = require('../rules/ruleEngine');
+const { MIN_LOG_DAYS_FOR_ML } = require('../utils/constants');
 
 async function runMl(features) {
   return predictCategory(features);
@@ -19,7 +20,18 @@ async function buildContext(userId, profileDoc, days = 7) {
   const summary = summariseLogs(logs);
   const rules = evaluateRules(profile, metrics, logs);
   const features = buildMlFeatures(profile, metrics, summary);
-  const ml = await runMl(features);
+  // With almost no logs the behavioural features are guesses (imputed), so the model
+  // would be predicting from defaults. Skip it and fall back to the rules.
+  const ml = summary.count >= MIN_LOG_DAYS_FOR_ML
+    ? await runMl(features)
+    : {
+      available: false,
+      skipped: true,
+      reason_code: 'insufficient_logs',
+      reason: `Log at least ${MIN_LOG_DAYS_FOR_ML} days of sleep, water and activity to enable ML personalisation; using rule-based output.`,
+      log_days: summary.count,
+      min_log_days: MIN_LOG_DAYS_FOR_ML,
+    };
   return {
     profile,
     metrics,

@@ -21,6 +21,13 @@ const env = {
   mlServiceUrl: (process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/$/, ''),
   mlEnabled: bool(process.env.ML_ENABLED, true),
   mlTimeoutMs: Number(process.env.ML_TIMEOUT_MS || 4000),
+  // Shared secret sent to the FastAPI service as X-Internal-Token.
+  mlInternalToken: process.env.ML_INTERNAL_TOKEN || '',
+  // Comma-separated emails allowed to run admin actions such as model retraining.
+  adminEmails: (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
   aiProvider: (process.env.AI_PROVIDER || 'openai').toLowerCase(),
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',

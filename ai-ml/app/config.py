@@ -15,3 +15,8 @@ if not METADATA_PATH.is_absolute():
     METADATA_PATH = ROOT / METADATA_PATH
 ML_ENABLED = os.getenv("ML_ENABLED", "true").lower() in ("1", "true", "yes")
 MIN_ACCURACY_TO_PROMOTE = 0.80
+
+# Shared secret for service-to-service calls (header X-Internal-Token).
+# Empty = not configured: /train, /retrain and /evaluate are then disabled (503),
+# while /predict and /model/* stay open for local development only.
+ML_INTERNAL_TOKEN = os.getenv("ML_INTERNAL_TOKEN", "")

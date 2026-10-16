@@ -39,7 +39,7 @@ Error:
 | GET | `/wellness-score` | yes |
 | POST/GET | `/feedback` | yes |
 | GET | `/ml/explanation` | yes |
-| POST | `/ml/retrain` | yes |
+| POST | `/ml/retrain` | yes, admin only (`ADMIN_EMAILS`); one run at a time (409 otherwise) |
 | GET | `/assistant/status` | yes |
 | POST | `/assistant` | yes |
 

@@ -1,3 +1,5 @@
+import math
+
 from app.utils.constants import (
     ACTIVITY_SCORES, EXERCISE_MINUTES_TARGET, GOALS, GENDERS,
     SLEEP_TARGET_HOURS, STEPS_TARGET,
@@ -30,27 +32,41 @@ GOAL_CODES = {goal: i for i, goal in enumerate(GOALS)}
 GENDER_CODES = {g: i for i, g in enumerate(GENDERS)}
 
 
+def round_half_up(value: float, decimals: int) -> float:
+    """Round half up using plain IEEE-754 operations.
+
+    Mirrors roundHalfUp() in backend/src/services/featureBuilder.js so both languages
+    produce bit-identical values. Do not use Python's round(): it rounds ties to even.
+    """
+    factor = float(10 ** decimals)
+    return math.floor(float(value) * factor + 0.5) / factor
+
+
 def build_feature_row(raw: dict) -> dict:
     water_target = raw.get("water_target_ml") or 2500
     calorie_target = raw.get("calorie_target") or 2000
-    sleep_hours = raw.get("sleep_hours", SLEEP_TARGET_HOURS)
-    hydration_ratio = (raw.get("water_ml", 0) or 0) / water_target
-    exercise_minutes = raw.get("exercise_minutes", 0) or 0
-    steps_ratio = (raw.get("steps", 0) or 0) / STEPS_TARGET
+    sleep_raw = raw.get("sleep_hours")
+    sleep_hours = float(SLEEP_TARGET_HOURS if sleep_raw is None else sleep_raw)
+    hydration_ratio = (raw.get("water_ml") or 0) / water_target
+    exercise_minutes = raw.get("exercise_minutes") or 0
+    steps_ratio = (raw.get("steps") or 0) / STEPS_TARGET
     calorie_ratio = (raw.get("calories") or calorie_target) / calorie_target
+    # Stress is a 1-5 scale: round (not truncate) an average, then clamp.
+    stress_raw = raw.get("stress_level")
+    stress = 3 if stress_raw is None else int(min(5, max(1, round_half_up(stress_raw, 0))))
     return {
-        "bmi": round(float(raw["bmi"]), 2),
+        "bmi": round_half_up(raw["bmi"], 2),
         "age": int(raw["age"]),
         "activity_score": ACTIVITY_SCORES.get(raw.get("activity_level"), 2),
-        "sleep_hours": round(float(sleep_hours), 2),
+        "sleep_hours": round_half_up(sleep_hours, 2),
         "sleep_adequacy": int(sleep_hours >= SLEEP_TARGET_HOURS),
-        "hydration_ratio": round(hydration_ratio, 3),
+        "hydration_ratio": round_half_up(hydration_ratio, 3),
         "hydration_adequacy": int(hydration_ratio >= 0.9),
-        "exercise_minutes": round(float(exercise_minutes), 1),
+        "exercise_minutes": round_half_up(exercise_minutes, 1),
         "exercise_adequacy": int(exercise_minutes >= EXERCISE_MINUTES_TARGET),
-        "steps_ratio": round(steps_ratio, 3),
-        "calorie_ratio": round(calorie_ratio, 3),
-        "stress_level": int(raw.get("stress_level") or 3),
+        "steps_ratio": round_half_up(steps_ratio, 3),
+        "calorie_ratio": round_half_up(calorie_ratio, 3),
+        "stress_level": stress,
         "goal_code": GOAL_CODES.get(raw.get("goal"), GOAL_CODES["general_wellness"]),
         "gender_code": GENDER_CODES.get(raw.get("gender"), GENDER_CODES["other"]),
     }

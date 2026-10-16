@@ -1,14 +1,34 @@
 const VALID_PROFILE = global.VALID_PROFILE;
 const authAgent = (email) => global.authAgent(email);
 
+// ML personalisation needs >= 3 logged days (MIN_LOG_DAYS_FOR_ML); log them via the API.
+async function logDays(agent, n) {
+  for (let i = 0; i < n; i += 1) {
+    const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const res = await agent.post('/api/logs').send({
+      date, sleep: 7, water: 2000, steps: 6000, exercise_minutes: 20,
+    });
+    expect(res.status).toBeLessThan(300);
+  }
+}
+
 describe('hybrid engine', () => {
   async function items(agent) {
     const plan = (await agent.get('/api/recommendations/nutrition')).body.data.plan;
     return Object.values(plan.meals).flatMap((meal) => meal.items);
   }
 
+  test('ml is skipped (rules only) when fewer than 3 days are logged', async () => {
+    const agent = await authAgent('hyb0@test.com');
+    await logDays(agent, 2);
+    const data = (await agent.get('/api/recommendations/nutrition')).body.data;
+    expect(data.source).toBe('rules_only');
+    expect(data.ml).toMatchObject({ available: false, skipped: true, reason_code: 'insufficient_logs', log_days: 2 });
+  });
+
   test('ml is used when available', async () => {
     const agent = await authAgent('hyb1@test.com');
+    await logDays(agent, 3);
     const data = (await agent.get('/api/recommendations/nutrition')).body.data;
     expect(data.source).toBe('hybrid');
     expect(data.ml.available).toBe(true);
@@ -17,6 +37,7 @@ describe('hybrid engine', () => {
 
   test('ml visibly influences ranking', async () => {
     const agent = await authAgent('hyb2@test.com');
+    await logDays(agent, 3);
     const list = await items(agent);
     expect(list.some((i) => i.ml_bonus > 0)).toBe(true);
   });
@@ -42,6 +63,7 @@ describe('hybrid engine', () => {
 
   test('ml cannot raise the difficulty ceiling', async () => {
     const agent = await authAgent('hyb5@test.com');
+    await logDays(agent, 3);
     await agent.put('/api/profile').send({ ...VALID_PROFILE, activity_level: 'sedentary' });
     const data = (await agent.get('/api/recommendations/activity')).body.data;
     expect(data.ml.available).toBe(true);

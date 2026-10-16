@@ -6,6 +6,7 @@ const { buildContext } = require('../services/recommendationService');
 const { buildTrainingRowsFromFeedback } = require('../services/feedbackService');
 const { retrain } = require('../services/mlService');
 const { env } = require('../config/env');
+const { ConflictError } = require('../utils/errors');
 const { success } = require('../utils/responses');
 const { currentUserId } = require('../utils/security');
 const { asyncHandler } = require('../middleware/validation');
@@ -22,7 +23,8 @@ const explanation = asyncHandler(async (req, res) => {
   const runs = await MLTrainingRun.find().sort({ createdAt: -1 }).limit(5);
 
   return success(res, {
-    model_available: ctx.ml.available || false,
+    // A user with too few logs is skipped by the gate; that is not the model being offline.
+    model_available: Boolean(ctx.ml.available || (ctx.ml.skipped && (merged.model_type || merged.modelType))),
     ml_enabled: env.mlEnabled,
     model_type: merged.model_type || merged.modelType || (ctx.ml.available ? ctx.ml.model_type : 'not loaded'),
     model_params: merged.model_params || merged.modelParams || {},
@@ -45,22 +47,34 @@ const explanation = asyncHandler(async (req, res) => {
   });
 });
 
+// One retraining run at a time (per Node process). A second request is rejected
+// instead of queuing, so repeated calls cannot pile up expensive training jobs.
+let retrainInProgress = false;
+
 const retrainFromFeedback = asyncHandler(async (_req, res) => {
-  const { rows, labels } = await buildTrainingRowsFromFeedback();
-  const result = await retrain(rows, labels, { force: false });
-  if (result && result.metrics) {
-    await MLTrainingRun.create({
-      modelType: result.model_type || result.modelType || 'RandomForestClassifier',
-      nSamples: result.n_samples || result.nSamples || rows.length,
-      accuracy: result.metrics.accuracy,
-      precision: result.metrics.precision,
-      recall: result.metrics.recall,
-      f1: result.metrics.f1,
-      promoted: Boolean(result.promoted),
-      notes: `${rows.length} feedback-derived rows included`,
-    });
+  if (retrainInProgress) {
+    throw new ConflictError('A retraining run is already in progress.', 'RETRAIN_IN_PROGRESS');
   }
-  return success(res, result, result.promoted ? 'Model retrained and promoted.' : 'Retraining completed.');
+  retrainInProgress = true;
+  try {
+    const { rows, labels } = await buildTrainingRowsFromFeedback();
+    const result = await retrain(rows, labels, { force: false });
+    if (result && result.metrics) {
+      await MLTrainingRun.create({
+        modelType: result.model_type || result.modelType || 'RandomForestClassifier',
+        nSamples: result.n_samples || result.nSamples || rows.length,
+        accuracy: result.metrics.accuracy,
+        precision: result.metrics.precision,
+        recall: result.metrics.recall,
+        f1: result.metrics.f1,
+        promoted: Boolean(result.promoted),
+        notes: `${rows.length} feedback-derived rows included`,
+      });
+    }
+    return success(res, result, result.promoted ? 'Model retrained and promoted.' : 'Retraining completed.');
+  } finally {
+    retrainInProgress = false;
+  }
 });
 
 module.exports = { explanation, retrainFromFeedback };

@@ -58,6 +58,7 @@ export const api = {
   login: (body) => post('/auth/login', body),
   logout: () => post('/auth/logout'),
   me: () => get('/auth/me'),
+  setResearchConsent: (consent) => put('/auth/research-consent', { consent }),
 
   getProfile: () => get('/profile'),
   saveProfile: (body) => put('/profile', body),

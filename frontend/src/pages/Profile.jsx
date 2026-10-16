@@ -9,6 +9,7 @@ import {
   Info
 } from 'lucide-react'
 import Card from '../components/Card'
+import ResearchConsentCard from '../components/ResearchConsentCard'
 import { ErrorState, Loading } from '../components/States'
 import { useToast } from '../context/ToastContext'
 import useApi from '../hooks/useApi'
@@ -420,6 +421,10 @@ export default function Profile() {
           </button>
         </div>
       </form>
+
+      <div style={{ marginTop: 24 }}>
+        <ResearchConsentCard />
+      </div>
 
       {/* App-wide medical disclaimer */}
       <div style={{

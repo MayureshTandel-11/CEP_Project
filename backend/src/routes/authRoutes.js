@@ -7,4 +7,5 @@ router.post('/register', ctrl.register);
 router.post('/login', ctrl.login);
 router.post('/logout', ctrl.logout);
 router.get('/me', requireAuth, ctrl.me);
+router.put('/research-consent', requireAuth, ctrl.setResearchConsent);
 module.exports = router;

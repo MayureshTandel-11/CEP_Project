@@ -28,6 +28,9 @@ const env = {
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
+  // Share of CONSENTING users randomly held out from ML adjustment (rules only), so the
+  // effect of the model can later be measured. 0 = no holdout (default).
+  mlControlFraction: Math.min(1, Math.max(0, Number(process.env.ML_CONTROL_FRACTION || 0) || 0)),
   aiProvider: (process.env.AI_PROVIDER || 'openai').toLowerCase(),
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',

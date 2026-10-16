@@ -10,6 +10,13 @@ const recommendationSchema = new mongoose.Schema({
   mlPrediction: { type: String, default: null },
   mlConfidence: { type: Number, default: null },
   source: { type: String, default: 'hybrid' },
+  // Outcome-study capture: what the model saw and did at the time of the plan.
+  featureSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+  plannedDailyMinutes: { type: Number, default: null },
+  modelVersion: { type: String, default: null },
+  adjustmentApplied: { type: Boolean, default: false },
+  controlGroup: { type: Boolean, default: false },
+  researchConsent: { type: Boolean, default: false },
   payload: { type: mongoose.Schema.Types.Mixed, default: null },
 }, { timestamps: true });
 

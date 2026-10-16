@@ -45,3 +45,14 @@ Error:
 
 Registration requires name, email, password (≥8 characters, letter + number).
 Login failures always return `Incorrect email or password.`
+
+## Research consent and outcome capture
+
+`PUT /api/auth/research-consent` (signed in) with `{"consent": true|false}` records or withdraws
+opt-in to model evaluation. Default is off. Only consenting users are ever eligible for the
+optional ML holdout (`ML_CONTROL_FRACTION`, default 0 = disabled) or the data export.
+
+Each stored activity recommendation records `featureSnapshot`, `plannedDailyMinutes`,
+`modelVersion`, `adjustmentApplied`, `controlGroup` and whether the user had consented.
+Export for the adherence pipeline: `node backend/scripts/exportAdherenceData.js --out DIR`
+(consenting users only; integer pseudonymous ids, per-user day indices, no dates/emails).

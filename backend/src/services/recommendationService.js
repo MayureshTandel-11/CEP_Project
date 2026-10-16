@@ -8,6 +8,9 @@ const { generateNutritionPlan } = require('./nutritionService');
 const { getLogs, summariseLogs } = require('./wellnessService');
 const { evaluateRules } = require('../rules/ruleEngine');
 const { MIN_LOG_DAYS_FOR_ML } = require('../utils/constants');
+const { env } = require('../config/env');
+const { CAPTURE } = require('./captureKey');
+const { isControlUser, hasResearchConsent } = require('./researchService');
 
 async function runMl(features) {
   return predictCategory(features);
@@ -22,7 +25,19 @@ async function buildContext(userId, profileDoc, days = 7) {
   const features = buildMlFeatures(profile, metrics, summary);
   // With almost no logs the behavioural features are guesses (imputed), so the model
   // would be predicting from defaults. Skip it and fall back to the rules.
-  const ml = summary.count >= MIN_LOG_DAYS_FOR_ML
+  // Optional randomised holdout (consenting users only) to measure the model's effect.
+  const controlGroup = summary.count >= MIN_LOG_DAYS_FOR_ML
+    && env.mlControlFraction > 0
+    && isControlUser(userId, env.mlControlFraction)
+    && await hasResearchConsent(userId);
+  const ml = controlGroup
+    ? {
+      available: false,
+      skipped: true,
+      reason_code: 'control_holdout',
+      reason: 'Rule-based output (you are in the research comparison group).',
+    }
+    : summary.count >= MIN_LOG_DAYS_FOR_ML
     ? await runMl(features)
     : {
       available: false,
@@ -40,6 +55,7 @@ async function buildContext(userId, profileDoc, days = 7) {
     rules,
     features,
     ml,
+    control_group: controlGroup,
     ml_category: ml.available ? ml.category : null,
     source: ml.available ? 'hybrid' : 'rules_only',
   };
@@ -50,6 +66,8 @@ function why(ctx, area) {
   let base;
   if (ml.available) {
     base = `Your plan follows your dietary and safety rules first, then the model's predicted focus area '${ml.category.replace(/_/g, ' ')}' (confidence ${ml.confidence}) was used to re-rank the options.`;
+  } else if (ml.skipped) {
+    base = `This plan was generated from the rule engine and your health metrics. ${ml.reason}`;
   } else {
     base = 'The ML model is currently unavailable, so this plan was generated from the rule engine and your health metrics alone.';
   }
@@ -90,7 +108,13 @@ function withLlm(result, llm, area) {
   };
 }
 
+function capture(ctx, result) {
+  result[CAPTURE] = { features: ctx.features, control_group: Boolean(ctx.control_group) };
+  return result;
+}
+
 async function finish(ctx, result, area) {
+  capture(ctx, result);
   const llm = await generateWellnessRecommendations(ctx.profile, ctx.metrics, ctx.summary);
   if (llm) {
     // Rule/ML explanation is kept as-is; the extra AI call for rewording is skipped.

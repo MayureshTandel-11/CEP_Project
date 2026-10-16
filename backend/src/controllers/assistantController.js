@@ -22,7 +22,7 @@ const assistant = asyncHandler(async (req, res) => {
   const metrics = computeHealthMetrics(engine);
   const summary = summariseLogs(await getLogs(userId, 7));
   const context = buildContext(engine, metrics, summary);
-  const result = await ask(String(data.message).slice(0, 1000), context);
+  const result = await ask(String(data.message).slice(0, 1000), context, engine);
   return success(res, { ...result, disclaimer: DISCLAIMER });
 });
 

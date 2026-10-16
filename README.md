@@ -14,7 +14,9 @@ transparent content-based scoring.
 React (Vite) talks to a Node.js Express API. Express owns authentication,
 health metrics, the rule engine, content-based ranking, and MongoDB persistence.
 A separate Python FastAPI service hosts scikit-learn. Optional OpenAI / Gemini /
-Llama wording sits after safety filtering and never overrides it.
+Llama output is **supplemental**: it is attached next to the rule/ML plan (never
+replacing it) and every item is checked against the user's allergies, diet and
+dislikes before it is returned (`backend/src/services/llmSafety.js`).
 
 See [docs/architecture.md](docs/architecture.md).
 
@@ -24,7 +26,8 @@ See [docs/architecture.md](docs/architecture.md).
 - Profile with validated lifestyle, preference and goal fields
 - BMI, BMR (Mifflin-St Jeor), TDEE, calorie target, macros, water target
 - Nutrition plan (breakfast / lunch / dinner / snacks) with a reason per food
-- Allergy, vegetarian, vegan and dislike filters that ML/AI cannot override
+- Allergy, vegetarian, vegan and dislike filters that ML/AI cannot override (AI text is
+  filtered with the same constraints and dropped if it cannot be checked)
 - Daily activity suggestions and a 7-day plan with difficulty ceilings
 - Wellness tips, logs, dashboard charts (7 / 30 / 90 days), engagement score
 - Feedback that can feed a gated retraining workflow
@@ -117,7 +120,8 @@ If the ML service is down, recommendations still work (`source: rules_only`).
 ## Tests
 
 ```bash
-npm test             # Jest + Supertest (Express)
+npm test             # Express: unit tests (no database) then Jest + Supertest (needs MongoDB)
+npm run test:unit --prefix backend   # only the database-free unit tests
 npm run test:ml      # pytest (FastAPI / sklearn)
 npm run build        # frontend production build
 ```

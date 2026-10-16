@@ -33,8 +33,9 @@ export default function Wellness() {
   if (error) return <ErrorState error={error} onRetry={reload} />
 
   const tips = data?.tips || []
-  const isLlm = data?.source === 'llm'
+  const isLlm = data?.llm_used === true
   const isHybrid = data?.source === 'hybrid'
+  const llmWellness = data?.llm_recommendations?.wellness || []
   const llmRec = data?.llm_recommendations
   const hasMedicalSafety = llmRec?.medical_safety?.length > 0
   const needsProfessionalGuidance = llmRec?.professional_guidance === true
@@ -51,7 +52,7 @@ export default function Wellness() {
         <span className={`pill ${isLlm ? 'ok' : isHybrid ? 'ok' : 'info'}`}>
           <Brain size={13} />
           <span>
-            {isLlm ? 'AI-Powered Recommendations' : isHybrid ? 'Hybrid Rules + ML Ranking' : 'Rule Engine Active'}
+            {isHybrid ? 'Hybrid Rules + ML Ranking' : 'Rule Engine Active'}{isLlm ? ' + AI notes' : ''}
           </span>
         </span>
       </div>
@@ -92,9 +93,7 @@ export default function Wellness() {
 
       <Card
         title="Today's Wellness Focus"
-        sub={isLlm
-          ? 'Personalized by AI using your profile, goals, and medical context.'
-          : isHybrid
+        sub={isHybrid
             ? 'Deterministically filtered for safety, with machine learning personalized focus ranking.'
             : 'Operating using rule-based algorithms (ML model service is currently offline).'}
         icon={HeartPulse}
@@ -144,6 +143,26 @@ export default function Wellness() {
           </div>
         )}
       </Card>
+
+      {llmWellness.length > 0 && (
+        <Card
+          title="AI suggestions"
+          sub="Extra ideas written by an AI assistant. Each one was checked against your allergies, diet and dislikes; your rule-based plan above is unchanged."
+          icon={Sparkles}
+        >
+          <div className="recommendations-grid">
+            {llmWellness.map((item, idx) => (
+              <div className="recommendation-card" key={`${item.title}-${idx}`}>
+                <div className="rec-card-body">
+                  <div className="rec-headline">{item.title}</div>
+                  <div className="rec-sub">{item.description}</div>
+                  {item.reason && <div className="rec-sub">{item.reason}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {data.why && <Why text={data.why} />}
 

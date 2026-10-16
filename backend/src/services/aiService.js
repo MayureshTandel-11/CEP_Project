@@ -1,4 +1,5 @@
 const { env } = require('../config/env');
+const { buildConstraints, filterLlmRecommendations, isTextSafe } = require('./llmSafety');
 
 const NOT_CONFIGURED_MESSAGE = (
   'The optional AI assistant is not configured. Core nutrition, activity, and '
@@ -207,7 +208,8 @@ function buildRecommendationPrompt(profile, metrics, summary) {
  * These cover medication instructions, diagnoses, and treatment claims.
  */
 const UNSAFE_PATTERNS = [
-  /stop\s+(taking|your)\s+medication/i,
+  // "stop medication", "stop taking medication", "stop taking your medication", "skip your insulin"...
+  /\b(?:stop|skip|quit|discontinue|cease)\s+(?:taking\s+|using\s+)?(?:your\s+|the\s+|any\s+)?(?:prescribed\s+)?(?:medications?|medicines?|meds|pills|insulin)\b/i,
   /change\s+(your\s+)?dosage/i,
   /increase\s+your\s+(dose|dosage|medication)/i,
   /decrease\s+your\s+(dose|dosage|medication)/i,
@@ -238,7 +240,9 @@ function isUnsafeText(text) {
  * Validate and sanitize LLM recommendation output.
  * Returns cleaned recommendations or null if validation fails critically.
  */
-function validateLlmOutput(parsed, allergies = []) {
+function validateLlmOutput(parsed) {
+  // Structural cleanup and medical-claim screening only. Allergy, diet and dislike
+  // enforcement lives in llmSafety.filterLlmRecommendations (applied by the caller).
   if (!parsed || typeof parsed !== 'object') return null;
 
   const VALID_PRIORITIES = new Set(['high', 'medium', 'low']);
@@ -252,17 +256,6 @@ function validateLlmOutput(parsed, allergies = []) {
         if (isUnsafeText(text)) {
           console.log(`[LLM Safety] Removed unsafe ${area} recommendation.`);
           return false;
-        }
-        // Check allergy conflicts in food descriptions
-        if (area === 'nutrition' && allergies.length > 0) {
-          const lower = text.toLowerCase();
-          for (const allergen of allergies) {
-            const a = allergen.replace(/_/g, ' ').toLowerCase();
-            if (lower.includes(a)) {
-              console.log(`[LLM Safety] Removed nutrition recommendation containing allergen: ${allergen}`);
-              return false;
-            }
-          }
         }
         return true;
       })
@@ -307,7 +300,6 @@ async function generateWellnessRecommendations(profile, metrics, summary) {
     return null;
   }
 
-  const allergies = profile.allergy_list || [];
   const prompt = buildRecommendationPrompt(profile, metrics, summary);
 
   console.log('[LLM Recommendations] Generation started.');
@@ -326,24 +318,42 @@ async function generateWellnessRecommendations(profile, metrics, summary) {
     if (!jsonMatch) throw new Error('No JSON object found in LLM response.');
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const validated = validateLlmOutput(parsed, allergies);
+    const validated = validateLlmOutput(parsed);
     if (!validated) throw new Error('LLM output failed safety validation.');
 
+    // Enforce allergies, vegan/vegetarian preference and dislikes on the free text.
+    const filtered = filterLlmRecommendations(validated, profile);
+    if (!filtered) throw new Error('LLM output could not be checked against the user profile.');
+    if (filtered.removed.length) {
+      console.log(`[LLM Safety] Removed ${filtered.removed.length} item(s) that conflicted with the user's constraints.`);
+    }
+
     console.log('[LLM Recommendations] Generation succeeded.');
-    return validated;
+    return filtered.result;
   } catch (err) {
     console.log(`[LLM Recommendations] Generation failed; fallback will be used. Reason: ${err.message}`);
     return null;
   }
 }
 
-async function ask(message, context) {
+const FILTERED_REPLY_MESSAGE = (
+  'I could not give an answer that is guaranteed to respect your allergies, diet and food '
+  + 'dislikes. Please rephrase, or use the nutrition plan, which is filtered by your profile.'
+);
+
+async function ask(message, context, profile) {
   const provider = getProvider();
   if (!provider) {
     return { available: false, reply: NOT_CONFIGURED_MESSAGE, provider: null };
   }
   try {
     const reply = await provider.complete(`${context}\n\nUser question: ${message}`);
+    // Free-text chat replies get the same constraint check as structured output.
+    let constraints = null;
+    try { constraints = buildConstraints(profile); } catch (err) { constraints = null; }
+    if (!constraints || !isTextSafe(reply, constraints) || isUnsafeText(reply)) {
+      return { available: true, reply: FILTERED_REPLY_MESSAGE, provider: provider.name, filtered: true };
+    }
     return { available: true, reply, provider: provider.name };
   } catch {
     return {
@@ -374,6 +384,9 @@ module.exports = {
   buildContext,
   buildRecommendationPrompt,
   generateWellnessRecommendations,
+  validateLlmOutput,
+  isUnsafeText,
+  FILTERED_REPLY_MESSAGE,
   ask,
   enhanceWording,
 };

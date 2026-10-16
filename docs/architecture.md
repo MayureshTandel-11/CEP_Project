@@ -29,7 +29,8 @@ FastAPI (ai-ml/)
 3. Health-metric rules
 4. ML focus category (bounded bonus, default cap 0.15)
 5. Content-based ranking
-6. Optional AI wording only
+6. Optional AI text only: attached as `llm_recommendations`, never replaces the plan,
+   and filtered against allergies, diet and dislikes (`llmSafety.js`, fail-closed)
 
 If FastAPI is down, `ML_ENABLED=false`, the model file is missing, or prediction
 fails, Express continues with rules + content scoring (`source: rules_only`).

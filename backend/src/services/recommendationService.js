@@ -2,6 +2,7 @@ const { generateWeeklyPlan, recommendToday } = require('./activityService');
 const { enhanceWording, generateWellnessRecommendations } = require('./aiService');
 const { buildMlFeatures } = require('./featureBuilder');
 const { computeHealthMetrics } = require('./healthMetricsService');
+const { buildConstraints, isTextSafe } = require('./llmSafety');
 const { predictCategory } = require('./mlService');
 const { generateNutritionPlan } = require('./nutritionService');
 const { getLogs, summariseLogs } = require('./wellnessService');
@@ -45,97 +46,59 @@ function why(ctx, area) {
   return base;
 }
 
-async function maybeEnhance(text) {
+/**
+ * Optional AI rewording of the explanation. The rewritten text is only used if it
+ * still satisfies the user's allergy, diet and dislike constraints.
+ */
+async function maybeEnhance(text, profile) {
   try {
-    return await enhanceWording(text);
+    const enhanced = await enhanceWording(text);
+    if (!enhanced || enhanced === text) return text;
+    return isTextSafe(enhanced, buildConstraints(profile)) ? enhanced : text;
   } catch {
     return text;
   }
 }
 
 /**
- * Format LLM nutrition array into the shape the existing frontend expects.
- * The existing frontend renders plan.meals, plan.targets, plan.totals, plan.excluded_count, etc.
- * We attach llm_recommendations alongside so Nutrition.jsx can display them if present.
+ * Attach validated LLM output to a rule/ML result WITHOUT changing the plan, tips,
+ * source or explanation. `llm` has already been filtered against the user's
+ * constraints by aiService.generateWellnessRecommendations.
  */
-function mergeLlmIntoNutritionResult(llm, ctx, plan) {
+function withLlm(result, llm, area) {
   return {
-    plan,
-    metrics: ctx.metrics,
-    rules: ctx.rules.by_area.nutrition,
-    ml: ctx.ml,
-    source: 'llm',
-    why: llm.summary || '',
+    ...result,
+    llm_used: true,
     llm_recommendations: {
       summary: llm.summary,
-      nutrition: llm.nutrition || [],
+      [area]: llm[area] || [],
       medical_safety: llm.medical_safety || [],
       professional_guidance: llm.professional_guidance || false,
     },
   };
 }
 
-function mergeLlmIntoActivityResult(llm, ctx, body) {
-  return {
-    plan: body,
-    metrics: ctx.metrics,
-    rules: ctx.rules.by_area.activity,
-    ml: ctx.ml,
-    source: 'llm',
-    why: llm.summary || '',
-    llm_recommendations: {
-      summary: llm.summary,
-      activity: llm.activity || [],
-      medical_safety: llm.medical_safety || [],
-      professional_guidance: llm.professional_guidance || false,
-    },
-  };
-}
-
-function mergeLlmIntoWellnessResult(llm, ctx) {
-  return {
-    // Convert LLM wellness items to the tip shape the frontend expects
-    tips: (llm.wellness || []).map((item) => ({
-      code: item.title.toLowerCase().replace(/\s+/g, '_').slice(0, 40),
-      message: item.description,
-      reason: item.reason,
-      priority: item.priority,
-    })),
-    summary: ctx.summary,
-    metrics: ctx.metrics,
-    ml: ctx.ml,
-    source: 'llm',
-    why: llm.summary || '',
-    llm_recommendations: {
-      summary: llm.summary,
-      wellness: llm.wellness || [],
-      medical_safety: llm.medical_safety || [],
-      professional_guidance: llm.professional_guidance || false,
-    },
-  };
+async function finish(ctx, result, area) {
+  const llm = await generateWellnessRecommendations(ctx.profile, ctx.metrics, ctx.summary);
+  if (llm) {
+    // Rule/ML explanation is kept as-is; the extra AI call for rewording is skipped.
+    return withLlm(result, llm, area);
+  }
+  const whyText = await maybeEnhance(result.why, ctx.profile);
+  return { ...result, why: whyText, llm_used: false };
 }
 
 async function nutritionRecommendation(userId, profileDoc) {
   const ctx = await buildContext(userId, profileDoc);
-  // Rule-based plan (always computed — fallback and used for targets/excluded display)
   const plan = await generateNutritionPlan(ctx.profile, ctx.metrics, ctx.rules.constraints, ctx.ml_category);
-
-  // Attempt LLM-primary recommendations
-  const llm = await generateWellnessRecommendations(ctx.profile, ctx.metrics, ctx.summary);
-  if (llm) {
-    return mergeLlmIntoNutritionResult(llm, ctx, plan);
-  }
-
-  // Fallback: existing rule-based + ML flow
-  const whyText = await maybeEnhance(why(ctx, 'nutrition'));
-  return {
+  return finish(ctx, {
     plan,
     metrics: ctx.metrics,
     rules: ctx.rules.by_area.nutrition,
     ml: ctx.ml,
     source: ctx.source,
-    why: whyText,
-  };
+    why: why(ctx, 'nutrition'),
+  }, 'nutrition');
 }
 
 async function activityRecommendation(userId, profileDoc, weekly = false) {
@@ -143,43 +106,26 @@ async function activityRecommendation(userId, profileDoc, weekly = false) {
   const body = weekly
     ? await generateWeeklyPlan(ctx.profile, ctx.metrics, ctx.ml_category)
     : await recommendToday(ctx.profile, ctx.metrics, ctx.ml_category);
-
-  // Attempt LLM-primary recommendations
-  const llm = await generateWellnessRecommendations(ctx.profile, ctx.metrics, ctx.summary);
-  if (llm) {
-    return mergeLlmIntoActivityResult(llm, ctx, body);
-  }
-
-  // Fallback: existing rule-based + ML flow
-  const whyText = await maybeEnhance(why(ctx, 'activity'));
-  return {
+  return finish(ctx, {
     plan: body,
     metrics: ctx.metrics,
     rules: ctx.rules.by_area.activity,
     ml: ctx.ml,
     source: ctx.source,
-    why: whyText,
-  };
+    why: why(ctx, 'activity'),
+  }, 'activity');
 }
 
 async function wellnessRecommendation(userId, profileDoc) {
   const ctx = await buildContext(userId, profileDoc);
-
-  // Attempt LLM-primary recommendations
-  const llm = await generateWellnessRecommendations(ctx.profile, ctx.metrics, ctx.summary);
-  if (llm) {
-    return mergeLlmIntoWellnessResult(llm, ctx);
-  }
-
-  // Fallback: existing rule engine
-  return {
+  return finish(ctx, {
     tips: ctx.rules.by_area.wellness,
     summary: ctx.summary,
     metrics: ctx.metrics,
     ml: ctx.ml,
     source: ctx.source,
-    why: await maybeEnhance(why(ctx, 'wellness')),
-  };
+    why: why(ctx, 'wellness'),
+  }, 'wellness');
 }
 
 module.exports = {

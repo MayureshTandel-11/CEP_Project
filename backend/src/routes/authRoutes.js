@@ -8,4 +8,5 @@ router.post('/login', ctrl.login);
 router.post('/logout', ctrl.logout);
 router.get('/me', requireAuth, ctrl.me);
 router.put('/research-consent', requireAuth, ctrl.setResearchConsent);
+router.put('/ai-consent', requireAuth, ctrl.setAiConsent);
 module.exports = router;

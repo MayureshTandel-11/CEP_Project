@@ -11,6 +11,7 @@ import {
 import Card from '../components/Card'
 import Disclaimer from '../components/Disclaimer'
 import { Loading } from '../components/States'
+import AiConsentHint from '../components/AiConsentHint'
 import useApi from '../hooks/useApi'
 import { api } from '../services/api'
 
@@ -51,6 +52,7 @@ export default function Assistant() {
   }
 
   const configured = status.data?.configured
+  const consented = status.data?.consent_external_ai === true
 
   return (
     <>
@@ -64,7 +66,7 @@ export default function Assistant() {
         {status.data && (
           <span className={`pill ${configured ? 'ok' : 'neutral'}`}>
             <Bot size={13} />
-            <span>{configured ? `Connected: ${status.data.provider}` : 'API Key Not Set'}</span>
+            <span>{!consented ? 'AI off (no consent)' : configured ? `Connected: ${status.data.provider}` : 'API Key Not Set'}</span>
           </span>
         )}
       </div>
@@ -79,7 +81,8 @@ export default function Assistant() {
             : 'Assistant offline. Add an OpenAI, Gemini, or Llama API key to backend .env to enable generative replies.'}
           icon={Bot}
         >
-          {!configured && (
+          {!consented && <AiConsentHint status="not_consented" />}
+          {consented && !configured && (
             <div className="why-box" style={{ marginBottom: 16, borderColor: 'var(--amber-border)', background: 'var(--amber-soft)' }}>
               <AlertCircle size={18} color="var(--amber)" style={{ flexShrink: 0 }} />
               <div>
@@ -153,12 +156,13 @@ export default function Assistant() {
                   id="q"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
+                  disabled={!consented}
                   placeholder="e.g. How can I optimize my sleep consistency this week?"
                   style={{ flex: 1 }}
                 />
                 <button
                   type="submit"
-                  disabled={busy || !draft.trim()}
+                  disabled={busy || !consented || !draft.trim()}
                   className="topbar-cta-btn"
                   style={{ padding: '0 20px', borderRadius: 'var(--r-sm)' }}
                 >

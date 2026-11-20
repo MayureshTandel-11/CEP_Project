@@ -1,5 +1,6 @@
 const { generateWeeklyPlan, recommendToday } = require('./activityService');
-const { enhanceWording, generateWellnessRecommendations } = require('./aiService');
+const { enhanceWording, generateWellnessRecommendations, getProvider } = require('./aiService');
+const { getAiConsent } = require('./consentService');
 const { buildMlFeatures } = require('./featureBuilder');
 const { computeHealthMetrics } = require('./healthMetricsService');
 const { buildConstraints, isTextSafe } = require('./llmSafety');
@@ -48,6 +49,7 @@ async function buildContext(userId, profileDoc, days = 7) {
       min_log_days: MIN_LOG_DAYS_FOR_ML,
     };
   return {
+    userId,
     profile,
     metrics,
     logs,
@@ -80,9 +82,9 @@ function why(ctx, area) {
  * Optional AI rewording of the explanation. The rewritten text is only used if it
  * still satisfies the user's allergy, diet and dislike constraints.
  */
-async function maybeEnhance(text, profile) {
+async function maybeEnhance(text, profile, consent) {
   try {
-    const enhanced = await enhanceWording(text);
+    const enhanced = await enhanceWording(text, consent);
     if (!enhanced || enhanced === text) return text;
     return isTextSafe(enhanced, buildConstraints(profile)) ? enhanced : text;
   } catch {
@@ -113,15 +115,26 @@ function capture(ctx, result) {
   return result;
 }
 
-async function finish(ctx, result, area) {
+/**
+ * ai_status says why AI text is or is not present:
+ *   not_consented  - the user has not allowed an external AI provider (nothing was sent)
+ *   not_configured - consent given but no provider is set up on the server
+ *   ok             - AI text was generated and passed the safety filters
+ *   unavailable    - a provider was tried but failed or returned nothing usable
+ */
+async function finish(ctx, result, area, { allowLlm = true } = {}) {
   capture(ctx, result);
-  const llm = await generateWellnessRecommendations(ctx.profile, ctx.metrics, ctx.summary);
+  const consent = await getAiConsent(ctx.userId);
+  if (!consent.external_ai) return { ...result, why: result.why, llm_used: false, ai_status: 'not_consented' };
+  if (!allowLlm) return { ...result, llm_used: false, ai_status: 'ok' };
+  if (!getProvider()) return { ...result, llm_used: false, ai_status: 'not_configured' };
+  const llm = await generateWellnessRecommendations(ctx.profile, ctx.metrics, ctx.summary, consent);
   if (llm) {
     // Rule/ML explanation is kept as-is; the extra AI call for rewording is skipped.
-    return withLlm(result, llm, area);
+    return { ...withLlm(result, llm, area), ai_status: 'ok' };
   }
-  const whyText = await maybeEnhance(result.why, ctx.profile);
-  return { ...result, why: whyText, llm_used: false };
+  const whyText = await maybeEnhance(result.why, ctx.profile, consent);
+  return { ...result, why: whyText, llm_used: false, ai_status: 'unavailable' };
 }
 
 async function nutritionRecommendation(userId, profileDoc) {
@@ -134,7 +147,10 @@ async function nutritionRecommendation(userId, profileDoc) {
     ml: ctx.ml,
     source: ctx.source,
     why: why(ctx, 'nutrition'),
-  }, 'nutrition');
+  }, 'nutrition', {
+    // With no safe food there is no plan to describe; AI text must not invent one.
+    allowLlm: plan.status !== 'no_safe_match',
+  });
 }
 
 async function activityRecommendation(userId, profileDoc, weekly = false) {

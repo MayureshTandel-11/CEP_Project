@@ -1,5 +1,6 @@
 const { ACTIVITY_LEVELS, FOOD_PREFERENCES, GENDERS, GOALS } = require('./constants');
 const { ValidationError } = require('./errors');
+const { IANA_SHAPE } = require('./localDate');
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/;
 
@@ -153,6 +154,26 @@ function normaliseTagList(value) {
   return Array.from(unique).sort();
 }
 
+/** True for an IANA zone name the runtime knows ("Asia/Kolkata", "UTC"); offsets like "+05:30" are rejected. */
+function isValidTimeZone(value) {
+  if (typeof value !== 'string') return false;
+  const zone = value.trim();
+  if (!zone || zone.length > 64 || !IANA_SHAPE.test(zone)) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function validateTimeZone(value) {
+  if (!isValidTimeZone(value)) {
+    throw new ValidationError('timezone must be an IANA time zone such as "Asia/Kolkata" or "UTC".', { timezone: 'invalid' });
+  }
+  return value.trim();
+}
+
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -175,4 +196,6 @@ module.exports = {
   validateDate,
   normaliseTagList,
   todayIso,
+  isValidTimeZone,
+  validateTimeZone,
 };

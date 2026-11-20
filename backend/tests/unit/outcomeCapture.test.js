@@ -5,6 +5,12 @@ jest.mock('../../src/services/mlService', () => ({ predictCategory: jest.fn() })
 jest.mock('../../src/services/aiService', () => ({
   enhanceWording: jest.fn(async (t) => t), generateWellnessRecommendations: jest.fn(async () => null),
 }));
+// AI is off until a user consents; these tests are about capture and the control arm, not AI text.
+jest.mock('../../src/services/consentService', () => ({
+  ...jest.requireActual('../../src/services/consentService'),
+  getAiConsent: jest.fn(async () => ({ external_ai: false, medical_data: false })),
+}));
+jest.mock('../../src/services/profileService', () => ({ getUserTimeZone: jest.fn(async () => 'UTC') }));
 jest.mock('../../src/services/researchService', () => ({
   ...jest.requireActual('../../src/services/researchService'),
   hasResearchConsent: jest.fn(),

@@ -113,6 +113,15 @@ function reasonFor(food, scored, profile, mlCategory) {
   return `Selected because it ${bits.join(', and ')}.`;
 }
 
+const NO_SAFE_MATCH_MESSAGE = 'No foods in the database match your allergies, dislikes and dietary preference, '
+  + 'so no meal plan was generated. Nothing was substituted. Review those settings or ask a dietitian.';
+
+/** Group the long "contains allergen: milk, soy" style reasons into a few countable categories. */
+function reasonCategory(reason) {
+  if (reason.startsWith('contains allergen')) return 'contains allergen';
+  return reason;
+}
+
 async function generateNutritionPlan(profile, metrics, constraints, mlCategory = null) {
   const allFoods = await Food.find();
   const allowed = [];
@@ -133,6 +142,9 @@ async function generateNutritionPlan(profile, metrics, constraints, mlCategory =
     const want = itemsPerMeal[meal];
     const idealItem = budget / want;
     const mealFoods = allowed.filter((f) => f.mealType === meal);
+    // When no safe food is tagged for this meal type, other safe foods are offered instead and
+    // the meal says so; nothing outside the safe list is ever used.
+    const mealTypeFallback = !mealFoods.length && allowed.length > 0;
     const candidates = mealFoods.length ? mealFoods : allowed;
     const ranked = candidates
       .map((f) => ({ food: f, ...scoreFood(f, meal, profile, metrics, idealItem, mlCategory) }))
@@ -158,10 +170,29 @@ async function generateNutritionPlan(profile, metrics, constraints, mlCategory =
       totals.fat += food.fat;
       totals.fiber += food.fiber;
     }
-    plan[meal] = { budget_calories: budget, planned_calories: Math.round(used * 10) / 10, items: chosen };
+    plan[meal] = {
+      status: chosen.length ? 'ok' : 'no_safe_match',
+      meal_type_fallback: mealTypeFallback && chosen.length > 0,
+      budget_calories: budget,
+      planned_calories: Math.round(used * 10) / 10,
+      items: chosen,
+    };
+  }
+
+  const mealStatuses = Object.values(plan).map((m) => m.status);
+  let status = 'ok';
+  if (mealStatuses.every((s) => s === 'no_safe_match')) status = 'no_safe_match';
+  else if (mealStatuses.some((s) => s === 'no_safe_match')) status = 'partial';
+
+  const exclusionReasons = {};
+  for (const [, why] of excluded) {
+    const key = reasonCategory(why);
+    exclusionReasons[key] = (exclusionReasons[key] || 0) + 1;
   }
 
   return {
+    status,
+    ...(status === 'no_safe_match' ? { message: NO_SAFE_MATCH_MESSAGE } : {}),
     meals: plan,
     totals: Object.fromEntries(Object.entries(totals).map(([k, v]) => [k, Math.round(v * 10) / 10])),
     targets: {
@@ -173,9 +204,10 @@ async function generateNutritionPlan(profile, metrics, constraints, mlCategory =
       water_ml: metrics.water_target_ml,
     },
     excluded_count: excluded.length,
+    exclusion_reasons: exclusionReasons,
     excluded_examples: excluded.slice(0, 8).map(([f, why]) => ({ food_name: f.foodName, reason: why })),
     ml_category_applied: mlCategory,
   };
 }
 
-module.exports = { ML_BONUS_CAP, scoreFood, generateNutritionPlan };
+module.exports = { NO_SAFE_MATCH_MESSAGE, ML_BONUS_CAP, scoreFood, generateNutritionPlan };

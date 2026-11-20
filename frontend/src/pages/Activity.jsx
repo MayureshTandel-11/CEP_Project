@@ -15,6 +15,7 @@ import Card from '../components/Card'
 import Disclaimer from '../components/Disclaimer'
 import { EmptyState, ErrorState, Loading } from '../components/States'
 import Why from '../components/Why'
+import AiConsentHint from '../components/AiConsentHint'
 import useApi from '../hooks/useApi'
 import { api } from '../services/api'
 
@@ -45,6 +46,8 @@ export default function Activity() {
           <ArrowRight size={14} />
         </Link>
       </div>
+
+      <AiConsentHint status={data?.ai_status} />
 
       {/* LLM Activity Recommendations */}
       {llmRec?.activity?.length > 0 && (

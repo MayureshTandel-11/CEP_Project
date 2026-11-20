@@ -4,7 +4,7 @@ const { buildContext } = require('./recommendationService');
 const { calculateWellnessScore, getLogs } = require('./wellnessService');
 const { DISCLAIMER } = require('../utils/constants');
 const { ValidationError } = require('../utils/errors');
-const { todayIso } = require('../utils/validators');
+const { localDateIso } = require('../utils/localDate');
 
 async function getDashboard(userId, range = 7) {
   const user = await User.findById(userId);
@@ -14,7 +14,7 @@ async function getDashboard(userId, range = 7) {
       user: user.toPublic(false),
       profile_complete: false,
       message: 'Complete your profile to unlock your dashboard.',
-      today: todayIso(),
+      today: localDateIso('UTC'),
       disclaimer: DISCLAIMER,
     };
   }
@@ -28,7 +28,7 @@ async function getDashboard(userId, range = 7) {
   return {
     user: user.toPublic(true),
     profile_complete: true,
-    today: todayIso(),
+    today: localDateIso(profileDoc.timezone),
     range: days,
     metrics: ctx.metrics,
     profile: profileDoc.toPublic(),

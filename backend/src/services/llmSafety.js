@@ -10,6 +10,7 @@
  */
 
 const { KNOWN_ALLERGENS } = require('../utils/constants');
+const { termRegex } = require('../utils/termMatch');
 
 const MEAT_TERMS = [
   'chicken', 'mutton', 'lamb', 'beef', 'pork', 'bacon', 'ham', 'turkey', 'duck',
@@ -65,19 +66,6 @@ const PLANT_DAIRY_PHRASES = new RegExp(
   'gi',
 );
 const DAIRY_TERM_SET = new Set(ALLERGEN_TERMS.milk);
-
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-const termRegexCache = new Map();
-function termRegex(term) {
-  if (!termRegexCache.has(term)) {
-    // Word boundaries: "egg" must not match "eggplant"; optional plural suffix.
-    termRegexCache.set(term, new RegExp(`\\b${escapeRegExp(term)}(?:s|es)?\\b`, 'i'));
-  }
-  return termRegexCache.get(term);
-}
 
 function normaliseKey(value) {
   return String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');

@@ -1,5 +1,6 @@
 const { Recommendation } = require('../models');
-const { todayIso } = require('../utils/validators');
+const { localDateIso } = require('../utils/localDate');
+const { getUserTimeZone } = require('./profileService');
 const { CAPTURE } = require('./captureKey');
 const { hasResearchConsent } = require('./researchService');
 
@@ -29,7 +30,7 @@ async function storeRecommendation(userId, recType, result) {
   const plan = result.plan || {};
   const record = await Recommendation.create({
     userId,
-    recDate: todayIso(),
+    recDate: localDateIso(await getUserTimeZone(userId)),
     recType,
     foodIds: recType === 'nutrition' ? extractIds(result, 'food') : [],
     activityIds: recType === 'activity' ? extractIds(result, 'activity') : [],

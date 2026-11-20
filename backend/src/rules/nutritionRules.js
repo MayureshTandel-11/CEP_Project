@@ -1,4 +1,5 @@
 const { MEAL_CALORIE_SPLIT } = require('../utils/constants');
+const { termMatches } = require('../utils/termMatch');
 
 function dietaryConstraints(profile) {
   return {
@@ -13,7 +14,7 @@ function isFoodAllowed(food, constraints) {
   const vegan = food.vegan;
   const vegetarian = food.vegetarian;
   const allergens = food.allergenTags || food.allergens || [];
-  const name = (food.foodName || food.food_name || '').toLowerCase();
+  const name = food.foodName || food.food_name || '';
 
   if (pref === 'vegan' && !vegan) return [false, 'not vegan'];
   if (pref === 'vegetarian' && !vegetarian) return [false, 'contains meat or fish'];
@@ -23,7 +24,8 @@ function isFoodAllowed(food, constraints) {
   if (hit.length) return [false, `contains allergen: ${hit.sort().join(', ')}`];
 
   for (const disliked of constraints.disliked || []) {
-    if (disliked && name.includes(disliked.replace(/_/g, ' '))) {
+    // Whole-word match: a dislike of "ham" must not remove "chamomile tea".
+    if (disliked && termMatches(name, disliked)) {
       return [false, 'on your dislikes list'];
     }
   }

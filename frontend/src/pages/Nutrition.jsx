@@ -20,6 +20,7 @@ import Disclaimer from '../components/Disclaimer'
 import Metric from '../components/Metric'
 import { ErrorState, Loading } from '../components/States'
 import Why from '../components/Why'
+import AiConsentHint from '../components/AiConsentHint'
 import useApi from '../hooks/useApi'
 import { api } from '../services/api'
 
@@ -108,6 +109,8 @@ export default function Nutrition() {
 
       <div style={{ height: 24 }} />
 
+      <AiConsentHint status={data.ai_status} />
+
       {/* LLM-generated nutrition recommendations (when AI is active) */}
       {data.llm_recommendations?.nutrition?.length > 0 && (
         <>
@@ -174,6 +177,26 @@ export default function Nutrition() {
         </>
       )}
 
+      {plan.status === 'no_safe_match' && (
+        <div className="why-box" role="alert" style={{ marginBottom: 16, borderColor: 'var(--amber-border)', background: 'var(--amber-soft)' }}>
+          <div>
+            <strong>No safe meal plan could be made.</strong> {plan.message}
+            {plan.exclusion_reasons && Object.keys(plan.exclusion_reasons).length > 0 && (
+              <ul style={{ margin: '6px 0 0 18px' }}>
+                {Object.entries(plan.exclusion_reasons).map(([reason, n]) => (
+                  <li key={reason}>{n} food{n === 1 ? '' : 's'}: {reason}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+      {plan.status === 'partial' && (
+        <div className="why-box" style={{ marginBottom: 16 }}>
+          <div>Some meals have no safe option under your allergies, dislikes and diet and are left empty.</div>
+        </div>
+      )}
+
       <Card
         title="Today's meals"
         sub={`Fibre target: ${t.fiber_g ?? 0} g · ${plan.excluded_count} foods excluded by your allergies & preferences`}
@@ -184,6 +207,7 @@ export default function Nutrition() {
             const block = plan.meals[meal]
             if (!block) return null
             const MealIcon = MEAL_ICONS[meal] || UtensilsCrossed
+            const noMatch = block.status === 'no_safe_match'
 
             return (
               <div className="meal-block" key={meal}>
@@ -197,6 +221,16 @@ export default function Nutrition() {
                   </span>
                 </div>
 
+                {noMatch && (
+                  <p className="food-reason" style={{ margin: '4px 0' }}>
+                    No safe food is available for this meal under your allergies, dislikes and diet.
+                  </p>
+                )}
+                {block.meal_type_fallback && (
+                  <p className="food-reason" style={{ margin: '4px 0' }}>
+                    No safe {meal} foods were found, so safe options from other meals are shown.
+                  </p>
+                )}
                 <div>
                   {block.items.map((item) => (
                     <div className="food-item" key={item.food_id}>

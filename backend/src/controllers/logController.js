@@ -3,7 +3,9 @@ const { getLogs } = require('../services/wellnessService');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const { created, success } = require('../utils/responses');
 const { currentUserId, requireOwnership } = require('../utils/security');
-const { requireJson, todayIso, validateDate, validateInt, validateNumber } = require('../utils/validators');
+const { localDateIso } = require('../utils/localDate');
+const { getUserTimeZone } = require('../services/profileService');
+const { requireJson, validateDate, validateInt, validateNumber } = require('../utils/validators');
 const { asyncHandler } = require('../middleware/validation');
 
 const ALLOWED_RANGES = [7, 30, 90];
@@ -26,14 +28,15 @@ function cleanLog(data) {
 
 const createLog = asyncHandler(async (req, res) => {
   const data = requireJson(req.body);
-  const logDate = validateDate(data.date || todayIso());
-  if (logDate > todayIso()) throw new ValidationError('You cannot log a future date.');
+  const userId = currentUserId(req);
+  const today = localDateIso(await getUserTimeZone(userId));
+  const logDate = validateDate(data.date || today);
+  if (logDate > today) throw new ValidationError('You cannot log a future date.');
   const cleaned = cleanLog(data);
   const values = Object.entries(cleaned).filter(([k]) => k !== 'notes').map(([, v]) => v);
   if (values.every((v) => v === null || v === '')) {
     throw new ValidationError('Please fill in at least one value before saving.');
   }
-  const userId = currentUserId(req);
   const existing = await UserLog.findOne({ userId, logDate });
   if (existing) {
     for (const [key, value] of Object.entries(cleaned)) {

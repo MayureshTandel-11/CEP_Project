@@ -2,8 +2,9 @@ const { UserProfile } = require('../models');
 const { NotFoundError } = require('../utils/errors');
 const {
   normaliseTagList, validateActivityLevel, validateFoodPreference,
-  validateGender, validateGoal, validateInt, validateNumber, validateRequired,
+  validateGender, validateGoal, validateInt, validateNumber, validateRequired, validateTimeZone,
 } = require('../utils/validators');
+const { DEFAULT_TIME_ZONE, safeTimeZone } = require('../utils/localDate');
 
 const REQUIRED_FIELDS = [
   'age', 'gender', 'height_cm', 'weight_kg', 'activity_level',
@@ -51,7 +52,7 @@ function cleanMedicalHistory(raw) {
 
 function clean(data) {
   validateRequired(data, REQUIRED_FIELDS);
-  return {
+  const cleaned = {
     age: validateInt(data.age, 'age'),
     gender: validateGender(data.gender),
     heightCm: validateNumber(data.height_cm, 'height_cm'),
@@ -70,6 +71,12 @@ function clean(data) {
     budget: data.budget || null,
     medical_history: cleanMedicalHistory(data.medical_history),
   };
+  // Written only when the client explicitly sends a zone: a profile saved without one keeps
+  // whatever it had (UTC for new and existing users). The server never infers a zone.
+  if (data.timezone !== undefined && data.timezone !== null && data.timezone !== '') {
+    cleaned.timezone = validateTimeZone(data.timezone);
+  }
+  return cleaned;
 }
 
 async function upsertProfile(userId, data) {
@@ -94,4 +101,12 @@ async function getProfileOrNone(userId) {
   return UserProfile.findOne({ userId });
 }
 
-module.exports = { REQUIRED_FIELDS, upsertProfile, getProfile, getProfileOrNone };
+/** The user's IANA zone, or UTC when there is no profile or no valid zone. */
+async function getUserTimeZone(userId) {
+  const profile = await UserProfile.findOne({ userId });
+  return safeTimeZone((profile && profile.timezone) || DEFAULT_TIME_ZONE);
+}
+
+module.exports = {
+  REQUIRED_FIELDS, upsertProfile, getProfile, getProfileOrNone, getUserTimeZone,
+};

@@ -12,6 +12,7 @@ import {
 import Card from '../components/Card'
 import Disclaimer from '../components/Disclaimer'
 import Why from '../components/Why'
+import AiConsentHint from '../components/AiConsentHint'
 import { EmptyState, ErrorState, Loading } from '../components/States'
 import useApi from '../hooks/useApi'
 import { api } from '../services/api'
@@ -56,6 +57,8 @@ export default function Wellness() {
           </span>
         </span>
       </div>
+
+      <AiConsentHint status={data?.ai_status} />
 
       {/* Professional guidance banner — shown only when LLM flagged it */}
       {needsProfessionalGuidance && (

@@ -3,14 +3,13 @@ const {
   EXERCISE_MINUTES_TARGET, SLEEP_TARGET_HOURS, STEPS_TARGET, WELLNESS_SCORE_WEIGHTS,
 } = require('../utils/constants');
 
-function daysAgoIso(days) {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - (days - 1));
-  return d.toISOString().slice(0, 10);
-}
+const { daysAgoIso } = require('../utils/localDate');
+const { getUserTimeZone } = require('./profileService');
 
-async function getLogs(userId, days = 7) {
-  const since = daysAgoIso(days);
+/** Logs for the last `days` calendar days, where "today" is in the user's time zone. */
+async function getLogs(userId, days = 7, timeZone = null) {
+  const zone = timeZone || await getUserTimeZone(userId);
+  const since = daysAgoIso(days, zone);
   return UserLog.find({ userId, logDate: { $gte: since } }).sort({ logDate: -1 });
 }
 

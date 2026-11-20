@@ -46,6 +46,24 @@ Error:
 Registration requires name, email, password (≥8 characters, letter + number).
 Login failures always return `Incorrect email or password.`
 
+## AI consent, time zone and safe-match behaviour
+
+- `PUT /api/auth/ai-consent` with `{"external_ai"?: bool, "medical_data"?: bool}`. Both are **off by default**.
+  `medical_data` needs `external_ai`; turning `external_ai` off turns both off.
+- With no external-AI consent nothing is sent to an AI provider (no request is made) and responses carry
+  `ai_status: "not_consented"`. Other values: `not_configured`, `ok`, `unavailable`.
+- A provider prompt is built only from an allowlist (`services/consentService.js`): age band, goal, activity level,
+  food preference, allergies, dislikes, BMI category, calorie/protein/water targets and 7-day averages.
+  Diagnosed condition **categories** are added only with both consents. Free text, medications, exact age, gender,
+  the BMI value, budget, stress, sitting hours and meal frequency are never sent.
+- Provider keys are never placed in URLs (Gemini uses the `x-goog-api-key` header), non-2xx replies are errors, and
+  logged error text is redacted.
+- `timezone` on the profile is an IANA name (`Asia/Kolkata`, `UTC`). It is UTC until the user sets one and is never
+  inferred; it decides what "today" is for logs, the dashboard and stored recommendations.
+- Nutrition plans carry `status`: `ok`, `partial` or `no_safe_match`, per-meal `status` and `meal_type_fallback`, and
+  `exclusion_reasons`. With no safe food the plan is empty with a message; nothing is substituted and no AI text is
+  requested for it. Dislikes and allergen terms match whole words only (`utils/termMatch.js`).
+
 ## Research consent and outcome capture
 
 `PUT /api/auth/research-consent` (signed in) with `{"consent": true|false}` records or withdraws

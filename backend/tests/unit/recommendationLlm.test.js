@@ -17,6 +17,11 @@ jest.mock('../../src/services/wellnessService', () => ({
   })),
 }));
 jest.mock('../../src/services/mlService', () => ({ predictCategory: jest.fn() }));
+// The user has consented to an external AI provider (medical categories are not shared).
+jest.mock('../../src/services/consentService', () => ({
+  ...jest.requireActual('../../src/services/consentService'),
+  getAiConsent: jest.fn(async () => ({ external_ai: true, medical_data: false })),
+}));
 
 const { env } = require('../../src/config/env');
 const { generateNutritionPlan } = require('../../src/services/nutritionService');
@@ -41,7 +46,7 @@ const ML_OK = {
 
 function mockLlmReply(payload) {
   const content = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  return { json: async () => ({ choices: [{ message: { content } }] }) };
+  return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }) };
 }
 
 const savedEnv = {};

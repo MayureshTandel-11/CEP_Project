@@ -18,6 +18,8 @@ const profileSchema = new mongoose.Schema({
   foodDislikes: { type: [String], default: [] },
   mealFrequency: { type: Number, default: null },
   budget: { type: String, default: null },
+  // IANA zone used to decide what "today" is. UTC until the user explicitly sets one; never inferred.
+  timezone: { type: String, default: 'UTC' },
   medical_history: {
     has_conditions: { type: Boolean, default: false },
     conditions: { type: [String], default: [] },
@@ -85,6 +87,7 @@ profileSchema.methods.toPublic = function toPublic() {
     food_dislikes: this.foodDislikes || [],
     meal_frequency: this.mealFrequency,
     budget: this.budget,
+    timezone: this.timezone || 'UTC',
     medical_history: this.medical_history
       ? {
           has_conditions: this.medical_history.has_conditions || false,

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import Card from '../components/Card'
 import ResearchConsentCard from '../components/ResearchConsentCard'
+import ExternalAiConsentCard from '../components/ExternalAiConsentCard'
 import { ErrorState, Loading } from '../components/States'
 import { useToast } from '../context/ToastContext'
 import useApi from '../hooks/useApi'
@@ -36,7 +37,7 @@ const BLANK = {
   activity_level: 'light', food_preference: 'vegetarian', allergies: [],
   sleep_hours: 7, goal: 'general_wellness', work_type: '', sitting_hours: '',
   water_intake_ml: '', stress_level: '', food_dislikes: '', meal_frequency: '',
-  budget: '',
+  budget: '', timezone: 'UTC',
   medical_history: {
     has_conditions: false,
     conditions: [],
@@ -73,6 +74,7 @@ export default function Profile() {
         work_type: saved.work_type || '', sitting_hours: saved.sitting_hours ?? '',
         water_intake_ml: saved.water_intake_ml ?? '', stress_level: saved.stress_level ?? '',
         meal_frequency: saved.meal_frequency ?? '', budget: saved.budget || '',
+        timezone: saved.timezone || 'UTC',
         medical_history: {
           has_conditions: mh.has_conditions || false,
           conditions: mh.conditions || [],
@@ -232,6 +234,28 @@ export default function Profile() {
               { type: 'number', min: 0, max: 24, step: '0.5', required: true })}
             {field('food_dislikes', 'Foods you would rather avoid',
               { placeholder: 'e.g. paneer, corn' })}
+          </div>
+
+          <div className="field" style={{ marginTop: 16 }}>
+            <label htmlFor="timezone">Time zone (decides what &ldquo;today&rdquo; is for your logs)</label>
+            <input
+              id="timezone" name="timezone" list="timezone-options" value={form.timezone}
+              onChange={change} placeholder="UTC or e.g. Asia/Kolkata"
+            />
+            <datalist id="timezone-options">
+              {(typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []).map((z) => (
+                <option key={z} value={z} />
+              ))}
+            </datalist>
+            <button
+              type="button" className="btn ghost" style={{ marginTop: 6, fontSize: '0.78rem' }}
+              onClick={() => setForm((f) => ({ ...f, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' }))}
+            >
+              Use my browser&apos;s time zone ({Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown'})
+            </button>
+            <small style={{ display: 'block', color: 'var(--ink-faint)' }}>
+              Until you choose one, UTC is used. It is never set for you automatically.
+            </small>
           </div>
 
           <div style={{ marginTop: 16 }}>
@@ -423,6 +447,8 @@ export default function Profile() {
       </form>
 
       <div style={{ marginTop: 24 }}>
+        <ExternalAiConsentCard />
+        <div style={{ height: 24 }} />
         <ResearchConsentCard />
       </div>
 
